@@ -12,6 +12,7 @@ const Signup = () => {
         role: 'MANAGER',
     });
     const [toast, setToast] = useState(null);
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const roles = [
@@ -22,48 +23,64 @@ const Signup = () => {
     ];
 
     const validateForm = () => {
-        if (formData.userName.trim().length < 3) {
-            setToast({ message: 'Username must be at least 3 characters', type: 'error' });
+        if (!formData.userName.trim()) {
+            setToast({ message: 'Username required', type: 'error' });
             return false;
         }
-
+        if (formData.userName.trim().length < 3) {
+            setToast({ message: 'Username min 3 characters', type: 'error' });
+            return false;
+        }
+        if (!formData.email) {
+            setToast({ message: 'Email required', type: 'error' });
+            return false;
+        }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(formData.email)) {
-            setToast({ message: 'Please enter a valid email address', type: 'error' });
+            setToast({ message: 'Invalid email', type: 'error' });
             return false;
         }
-
-
+        if (!formData.password) {
+            setToast({ message: 'Password required', type: 'error' });
+            return false;
+        }
         if (formData.password.length < 6) {
-            setToast({ message: 'Password must be at least 6 characters', type: 'error' });
+            setToast({ message: 'Password min 6 characters', type: 'error' });
             return false;
         }
-
-        if (!formData.role) {
-            setToast({ message: 'Please select a role', type: 'error' });
-            return false;
-        }
-
         return true;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (!validateForm()) return;
 
-        if (validateForm()) {
-            try {
-                const response = await axios.post(`${import.meta.env.VITE_SERVER_URL}/auth/register`, formData);
-                console.log('Registration response:', response.data);
-                setToast({ message: 'Account created successfully!', type: 'success' });
-
-                setTimeout(() => {
-                    navigate('/login');
-                }, 2000);
-            } catch (error) {
-                console.error('Registration error:', error);
-                const errorMessage = error.response?.data?.message || error.message || 'Registration failed. Please try again.';
-                setToast({ message: errorMessage, type: 'error' });
+        setLoading(true);
+        try {
+            const response = await axios.post(
+                `${import.meta.env.VITE_SERVER_URL}/auth/register`, 
+                formData
+            );
+            
+            setToast({ message: 'Account created!', type: 'success' });
+            setTimeout(() => navigate('/login', { state: { email: formData.email } }), 1500);
+        } catch (error) {
+            let message = 'Registration failed';
+            
+            if (error.response?.data?.message) {
+                message = error.response.data.message;
+            } else if (error.response?.status === 400) {
+                message = 'Email already exists';
+            } else if (!window.navigator.onLine) {
+                message = 'No internet connection';
+            } else if (error.request && !error.response) {
+                message = 'Server unavailable';
             }
+            
+            setToast({ message, type: 'error' });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -80,7 +97,7 @@ const Signup = () => {
             <div className="glass-card">
                 <div className="auth-header">
                     <h1 className="auth-title">Create Account</h1>
-                    <p className="auth-subtitle">Join FleetFlow to get started</p>
+                    <p className="auth-subtitle">Join FleetFlow</p>
                 </div>
 
                 <form onSubmit={handleSubmit}>
@@ -94,13 +111,13 @@ const Signup = () => {
                                 placeholder="johndoe"
                                 value={formData.userName}
                                 onChange={(e) => setFormData({ ...formData, userName: e.target.value })}
-                                required
+                                disabled={loading}
                             />
                         </div>
                     </div>
 
                     <div className="input-group">
-                        <label className="input-label">Email Address</label>
+                        <label className="input-label">Email</label>
                         <div className="input-wrapper">
                             <Mail className="input-icon" />
                             <input
@@ -109,7 +126,7 @@ const Signup = () => {
                                 placeholder="name@example.com"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                required
+                                disabled={loading}
                             />
                         </div>
                     </div>
@@ -122,7 +139,7 @@ const Signup = () => {
                                 className="input-field role-select"
                                 value={formData.role}
                                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                required
+                                disabled={loading}
                             >
                                 {roles.map(role => (
                                     <option key={role} value={role}>{role.replace('_', ' ')}</option>
@@ -141,22 +158,22 @@ const Signup = () => {
                                 placeholder="••••••••"
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                required
+                                disabled={loading}
                             />
                         </div>
                     </div>
 
-                    <button type="submit" className="btn-primary">
+                    <button type="submit" className="btn-primary" disabled={loading}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                             <UserPlus size={20} />
-                            Create Account
+                            {loading ? 'Creating...' : 'Create Account'}
                         </div>
                     </button>
                 </form>
 
                 <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.875rem', color: '#94a3b8' }}>
-                    Already have an account?{' '}
-                    <button onClick={() => navigate('/login')} className="btn-secondary">
+                    Have an account?{' '}
+                    <button onClick={() => navigate('/login')} className="btn-secondary" disabled={loading}>
                         Login
                     </button>
                 </div>
