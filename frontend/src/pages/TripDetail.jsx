@@ -12,6 +12,7 @@ import {
   Package,
   Clock,
   XCircle,
+  Trash2,
 } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import Badge from "../components/ui/Badge";
@@ -22,6 +23,7 @@ import {
   getTrip,
   addExpense,
   getTripExpenses,
+  deleteExpense,
 } from "../services/trips.service";
 
 const PRIORITY_COLORS = {
@@ -75,8 +77,25 @@ export default function TripDetail() {
       toast.error(e.response?.data?.message ?? "Failed to add expense"),
   });
 
+  const delExpMut = useMutation({
+    mutationFn: ({ expId }) => deleteExpense(id, expId),
+    onSuccess: () => {
+      toast.success("Expense deleted");
+      qc.invalidateQueries({ queryKey: ["tripExpenses", id] });
+    },
+    onError: (e) =>
+      toast.error(e.response?.data?.message ?? "Failed to delete expense"),
+  });
+
   const handleAddExp = () => {
     if (!expForm.amount) return;
+    if (
+      expForm.expense_type === "fuel" &&
+      (!expForm.fuel_quantity || Number(expForm.fuel_quantity) <= 0)
+    ) {
+      toast.error("Fuel quantity must be greater than 0");
+      return;
+    }
     const payload = {
       expense_type: expForm.expense_type,
       amount: Number(expForm.amount),
@@ -351,11 +370,11 @@ export default function TripDetail() {
               <div className="space-y-3">
                 {expenses.map((exp, i) => (
                   <div
-                    key={i}
+                    key={exp._id ?? i}
                     className="border-b border-gray-800 pb-3 last:border-0 last:pb-0"
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-gray-300 capitalize text-sm">
                             {exp.expense_type}
@@ -388,9 +407,25 @@ export default function TripDetail() {
                           </p>
                         )}
                       </div>
-                      <span className="text-white font-medium text-sm">
-                        ₹{exp.amount?.toLocaleString()}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-white font-medium text-sm">
+                          ₹{exp.amount?.toLocaleString()}
+                        </span>
+                        {["draft", "dispatched", "in_transit"].includes(
+                          trip.status,
+                        ) && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm("Delete this expense?"))
+                                delExpMut.mutate({ expId: exp._id });
+                            }}
+                            className="p-1 text-gray-600 hover:text-red-400 transition-colors"
+                            title="Delete expense"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -495,7 +530,12 @@ export default function TripDetail() {
           </button>
           <button
             onClick={handleAddExp}
-            disabled={addExpMut.isPending || !expForm.amount}
+            disabled={
+              addExpMut.isPending ||
+              !expForm.amount ||
+              (expForm.expense_type === "fuel" &&
+                (!expForm.fuel_quantity || Number(expForm.fuel_quantity) <= 0))
+            }
             className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-60"
           >
             {addExpMut.isPending ? "Adding..." : "Add Expense"}

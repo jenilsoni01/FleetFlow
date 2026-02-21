@@ -10,6 +10,7 @@ import {
   cancelTrip,
   addExpense,
   getTripExpenses,
+  deleteExpense,
 } from "../controllers/trip.controller.js";
 
 import {
@@ -33,9 +34,6 @@ router.get("/", verifyJwt, getTrips);
 // Get single trip by ID
 router.get("/:id", verifyJwt, getTrip);
 
-// Update trip details (only for draft/dispatched status)
-router.patch("/:id", verifyJwt, validateTripUpdate, updateTrip);
-
 // Dispatch trip (draft -> dispatched, updates vehicle and driver status)
 router.patch("/dispatch/:id", verifyJwt, dispatchTrip);
 
@@ -48,10 +46,16 @@ router.patch("/complete/:id", verifyJwt, validateTripCompletion, completeTrip);
 // Cancel trip (any status -> cancelled, frees up vehicle and driver)
 router.patch("/cancel/:id", verifyJwt, validateTripCancellation, cancelTrip);
 
+// Update trip details (only for draft/dispatched status)
+router.patch("/:id", verifyJwt, validateTripUpdate, updateTrip);
+
 // Add expense to trip
 router.post("/:id/expenses", verifyJwt, validateExpense, addExpense);
 
 // Get trip expenses
 router.get("/:id/expenses", verifyJwt, getTripExpenses);
+
+// Delete a single expense (soft-delete)
+router.delete("/:id/expenses/:expId", verifyJwt, deleteExpense);
 
 export default router;

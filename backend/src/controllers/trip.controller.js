@@ -27,14 +27,17 @@ export const createTrip = asyncHandler(async (req, res) => {
   }
 
   if (vehicle.status !== "available") {
-    throw new ApiError(400, `Vehicle is not available (current status: ${vehicle.status})`);
+    throw new ApiError(
+      400,
+      `Vehicle is not available (current status: ${vehicle.status})`,
+    );
   }
 
   // Check cargo weight against vehicle capacity
   if (cargo_weight_kg && cargo_weight_kg > vehicle.max_load_kg) {
     throw new ApiError(
       400,
-      `Cargo weight (${cargo_weight_kg}kg) exceeds vehicle max load capacity (${vehicle.max_load_kg}kg)`
+      `Cargo weight (${cargo_weight_kg}kg) exceeds vehicle max load capacity (${vehicle.max_load_kg}kg)`,
     );
   }
 
@@ -94,7 +97,7 @@ export const createTrip = asyncHandler(async (req, res) => {
     ) {
       throw new ApiError(
         400,
-        `Driver license category (${driver.license_category}) does not match vehicle requirement (${vehicle.vehicle_type.required_license_category})`
+        `Driver license category (${driver.license_category}) does not match vehicle requirement (${vehicle.vehicle_type.required_license_category})`,
       );
     }
 
@@ -121,7 +124,8 @@ export const createTrip = asyncHandler(async (req, res) => {
 
 // GET ALL TRIPS
 export const getTrips = asyncHandler(async (req, res) => {
-  const { status, vehicle_id, driver_id, region_id, priority, active } = req.query;
+  const { status, vehicle_id, driver_id, region_id, priority, active } =
+    req.query;
 
   const filter = {};
   if (status) filter.status = status;
@@ -173,7 +177,8 @@ export const updateTrip = asyncHandler(async (req, res) => {
   // Update fields if provided
   if (origin !== undefined) trip.origin = origin;
   if (destination !== undefined) trip.destination = destination;
-  if (cargo_description !== undefined) trip.cargo.description = cargo_description;
+  if (cargo_description !== undefined)
+    trip.cargo.description = cargo_description;
   if (cargo_weight_kg !== undefined) {
     // Validate against vehicle capacity
     if (cargo_weight_kg > trip.vehicle.max_load_kg) {
@@ -181,8 +186,10 @@ export const updateTrip = asyncHandler(async (req, res) => {
     }
     trip.cargo.weight_kg = cargo_weight_kg;
   }
-  if (scheduled_departure !== undefined) trip.schedule.scheduled_departure = scheduled_departure;
-  if (estimated_arrival !== undefined) trip.schedule.estimated_arrival = estimated_arrival;
+  if (scheduled_departure !== undefined)
+    trip.schedule.scheduled_departure = scheduled_departure;
+  if (estimated_arrival !== undefined)
+    trip.schedule.estimated_arrival = estimated_arrival;
   if (priority !== undefined) trip.priority = priority;
 
   trip.updated_by = req.user?._id;
@@ -282,7 +289,7 @@ export const completeTrip = asyncHandler(async (req, res) => {
   if (!odometer_end || odometer_end < trip.odometer.start) {
     throw new ApiError(
       400,
-      `End odometer (${odometer_end}) must be greater than start odometer (${trip.odometer.start})`
+      `End odometer (${odometer_end}) must be greater than start odometer (${trip.odometer.start})`,
     );
   }
 
@@ -370,10 +377,18 @@ export const cancelTrip = asyncHandler(async (req, res) => {
 
 // ADD EXPENSE TO TRIP
 export const addExpense = asyncHandler(async (req, res) => {
-  const trip = await FleetTrip.findById(req.params.id);
+  const trip = await FleetTrip.findOne({ _id: req.params.id, active: true });
 
   if (!trip) {
     throw new ApiError(404, "Trip not found");
+  }
+
+  const addableStatuses = ["draft", "dispatched", "in_transit"];
+  if (!addableStatuses.includes(trip.status)) {
+    throw new ApiError(
+      400,
+      `Cannot add expenses to a trip with status "${trip.status}". Trip must be draft, dispatched, or in transit.`,
+    );
   }
 
   const {
@@ -394,23 +409,26 @@ export const addExpense = asyncHandler(async (req, res) => {
 
   const expenseData = {
     expense_type,
-    amount,
+    amount: Number(amount),
     expense_date: expense_date || new Date(),
     notes: notes || "",
+    active: true,
     created_by: req.user?._id,
   };
 
-  // Add fuel details if expense type is fuel
   if (expense_type === "fuel") {
-    if (!fuel_quantity || !fuel_type) {
-      throw new ApiError(400, "Fuel quantity and fuel type are required for fuel expenses");
+    if (!fuel_quantity || Number(fuel_quantity) <= 0 || !fuel_type) {
+      throw new ApiError(
+        400,
+        "Fuel quantity (> 0) and fuel type are required for fuel expenses",
+      );
     }
     expenseData.fuel_details = {
-      quantity: fuel_quantity,
-      unit_price: fuel_unit_price || 0,
+      quantity: Number(fuel_quantity),
+      unit_price: fuel_unit_price ? Number(fuel_unit_price) : 0,
       fuel_type,
       station_name: station_name || "",
-      odometer_reading: odometer_reading || 0,
+      odometer_reading: odometer_reading ? Number(odometer_reading) : 0,
     };
   }
 
@@ -418,22 +436,49 @@ export const addExpense = asyncHandler(async (req, res) => {
   trip.updated_by = req.user?._id;
   await trip.save();
 
+  const newExpense = trip.expenses[trip.expenses.length - 1];
+
   return res
     .status(201)
-    .json(new ApiResponse(201, trip, "Expense added successfully"));
+    .json(new ApiResponse(201, newExpense, "Expense added successfully"));
 });
 
 // GET TRIP EXPENSES
 export const getTripExpenses = asyncHandler(async (req, res) => {
-  const trip = await FleetTrip.findById(req.params.id);
+  const trip = await FleetTrip.findOne({ _id: req.params.id, active: true });
 
   if (!trip) {
     throw new ApiError(404, "Trip not found");
   }
 
-  const activeExpenses = trip.expenses.filter((exp) => exp.active);
+  const activeExpenses = trip.expenses.filter((exp) => exp.active !== false);
 
   return res
     .status(200)
-    .json(new ApiResponse(200, activeExpenses, "Expenses retrieved successfully"));
+    .json(
+      new ApiResponse(200, activeExpenses, "Expenses retrieved successfully"),
+    );
+});
+
+// DELETE (SOFT) A SINGLE EXPENSE
+export const deleteExpense = asyncHandler(async (req, res) => {
+  const { id, expId } = req.params;
+  const trip = await FleetTrip.findOne({ _id: id, active: true });
+
+  if (!trip) {
+    throw new ApiError(404, "Trip not found");
+  }
+
+  const expense = trip.expenses.id(expId);
+  if (!expense || expense.active === false) {
+    throw new ApiError(404, "Expense not found");
+  }
+
+  expense.active = false;
+  trip.updated_by = req.user?._id;
+  await trip.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "Expense deleted successfully"));
 });

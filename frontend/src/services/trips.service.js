@@ -28,3 +28,6 @@ export const addExpense = (id, data) =>
 
 export const getTripExpenses = (id) =>
   api.get(`/trips/${id}/expenses`).then((r) => r.data.data);
+
+export const deleteExpense = (tripId, expId) =>
+  api.delete(`/trips/${tripId}/expenses/${expId}`).then((r) => r.data);
