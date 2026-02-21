@@ -411,20 +411,16 @@ export default function TripDetail() {
                         <span className="text-white font-medium text-sm">
                           ₹{exp.amount?.toLocaleString()}
                         </span>
-                        {["draft", "dispatched", "in_transit"].includes(
-                          trip.status,
-                        ) && (
-                          <button
-                            onClick={() => {
-                              if (window.confirm("Delete this expense?"))
-                                delExpMut.mutate({ expId: exp._id });
-                            }}
-                            className="p-1 text-gray-600 hover:text-red-400 transition-colors"
-                            title="Delete expense"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            if (window.confirm("Delete this expense?"))
+                              delExpMut.mutate({ expId: exp._id });
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                          title="Delete expense"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </div>
                     </div>
                   </div>
