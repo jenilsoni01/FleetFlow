@@ -7,6 +7,7 @@ import {
   Route,
   Wrench,
   DollarSign,
+  BarChart2,
   LogOut,
   ChevronRight,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const ALL_NAV_ITEMS = [
   { to: "/drivers", icon: Users, label: "Drivers" },
   { to: "/maintenance", icon: Wrench, label: "Maintenance" },
   { to: "/expenses", icon: DollarSign, label: "Expenses" },
+  { to: "/analytics", icon: BarChart2, label: "Analytics" },
 ];
 
 export default function Sidebar() {

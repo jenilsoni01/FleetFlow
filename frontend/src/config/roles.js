@@ -35,6 +35,7 @@ export const ROUTE_ROLES = {
   "/drivers": ["MANAGER", "DISPATCHER", "SAFETY_OFFICER"],
   "/maintenance": ["MANAGER", "SAFETY_OFFICER"],
   "/expenses": ["MANAGER", "FINANCIAL_ANALYST"],
+  "/analytics": ["MANAGER", "FINANCIAL_ANALYST"],
 };
 
 // ── Dashboard sections visible per role ──────────────────────────────────────
@@ -58,6 +59,7 @@ export const NAV_ROLES = {
   "/drivers": ["MANAGER", "DISPATCHER", "SAFETY_OFFICER"],
   "/maintenance": ["MANAGER", "SAFETY_OFFICER"],
   "/expenses": ["MANAGER", "FINANCIAL_ANALYST"],
+  "/analytics": ["MANAGER", "FINANCIAL_ANALYST"],
 };
 
 /**

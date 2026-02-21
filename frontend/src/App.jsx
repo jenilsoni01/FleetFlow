@@ -18,6 +18,7 @@ import Vehicles from "./pages/Vehicles";
 import Drivers from "./pages/Drivers";
 import Maintenance from "./pages/Maintenance";
 import Expenses from "./pages/Expenses";
+import Analytics from "./pages/Analytics";
 import Unauthorized from "./pages/Unauthorized";
 import { ROUTE_ROLES } from "./config/roles";
 import "./App.css";
@@ -95,6 +96,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={ROUTE_ROLES["/expenses"]}>
                     <Expenses />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/analytics"
+                element={
+                  <ProtectedRoute allowedRoles={ROUTE_ROLES["/analytics"]}>
+                    <Analytics />
                   </ProtectedRoute>
                 }
               />
