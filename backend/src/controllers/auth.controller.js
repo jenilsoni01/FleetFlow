@@ -24,22 +24,16 @@ const hashToken = (token) => {
 };
 
 const generateAccessAndRefreshTokens = async (userId) => {
-  try {
-    const user = await User.findById(userId);
+  const user = await User.findById(userId);
+  if (!user) throw new ApiError(500, "User not found after creation");
 
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
 
-    user.refreshToken = hashToken(refreshToken);
-    await user.save({ validateBeforeSave: false });
+  user.refreshToken = hashToken(refreshToken);
+  await user.save({ validateBeforeSave: false });
 
-    return { accessToken, refreshToken };
-  } catch (error) {
-    throw new ApiError(
-      500,
-      "Something went wrong while generating refresh and access tokens",
-    );
-  }
+  return { accessToken, refreshToken };
 };
 
 const registerUser = asyncHandler(async (req, res) => {
