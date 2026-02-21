@@ -2,24 +2,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { DollarSign, TrendingUp, Search, Car } from "lucide-react";
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
+  Cell,
 } from "recharts";
 import AppLayout from "../components/layout/AppLayout";
-import Badge from "../components/ui/Badge";
 import EmptyState from "../components/ui/EmptyState";
 import { PageSpinner } from "../components/ui/Spinner";
 import {
   listExpenses,
-  getMonthlyBurnRate,
   getVehicleOperationalCost,
   getVehicleFuelEfficiency,
 } from "../services/expenses.service";
@@ -27,12 +23,6 @@ import { getVehicles } from "../services/vehicles.service";
 
 const TABS = ["List", "Analytics"];
 const EXPENSE_TYPES = ["all", "fuel", "toll", "parking", "fine", "other"];
-
-const CHART_COLORS = {
-  trip_expenses: "#f59e0b",
-  maintenance: "#6366f1",
-  total: "#10b981",
-};
 
 const TYPE_COLORS = {
   fuel: "#f59e0b",
@@ -61,20 +51,6 @@ function KpiMini({ label, value, sub, color = "text-white" }) {
   );
 }
 
-function CustomTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm shadow-xl">
-      <p className="text-gray-400 mb-1">{label}</p>
-      {payload.map((p) => (
-        <p key={p.name} style={{ color: p.color ?? "#fff" }}>
-          {p.name}: {String(p.value).startsWith("₹") ? "" : "₹"}{Number(p.value ?? 0).toLocaleString()}
-        </p>
-      ))}
-    </div>
-  );
-}
-
 function FuelTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -89,18 +65,36 @@ function FuelTooltip({ active, payload, label }) {
   );
 }
 
+function ExpenseTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs shadow-xl max-w-56">
+      <p className="text-gray-400 mb-1">{d.fullDate ?? d.label}</p>
+      <p className="text-white font-semibold mb-1">
+        ₹{Number(d.amount ?? 0).toLocaleString()}
+      </p>
+      <p
+        style={{ color: TYPE_COLORS[d.type] ?? "#9ca3af" }}
+        className="capitalize mb-0.5"
+      >
+        {d.type}
+      </p>
+      {d.tripRef && <p className="text-indigo-400 font-mono">{d.tripRef}</p>}
+      {d.description && (
+        <p className="text-gray-500 mt-0.5 truncate">{d.description}</p>
+      )}
+    </div>
+  );
+}
+
 function AnalyticsTab() {
   const [vehicleId, setVehicleId] = useState("");
+  const [chartType, setChartType] = useState("all");
 
   const vehicles = useQuery({
     queryKey: ["vehicles-lite"],
     queryFn: () => getVehicles({ limit: 200 }),
-    staleTime: 60_000,
-  });
-
-  const burnRate = useQuery({
-    queryKey: ["burn-rate"],
-    queryFn: () => getMonthlyBurnRate(),
     staleTime: 60_000,
   });
 
@@ -118,8 +112,45 @@ function AnalyticsTab() {
     staleTime: 60_000,
   });
 
-  // Backend: { burnRate: [...], months: N }
-  const burnData = burnRate.data?.burnRate ?? [];
+  const allExpenses = useQuery({
+    queryKey: ["all-expenses-chart"],
+    queryFn: () => listExpenses({ limit: 500 }),
+    staleTime: 60_000,
+  });
+
+  const expenseChartData = (
+    allExpenses.data?.expenses ??
+    allExpenses.data ??
+    []
+  )
+    .filter((e) => e.expense_date && e.amount)
+    .filter((e) => chartType === "all" || e.expense_type === chartType)
+    .sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date))
+    .map((e) => ({
+      label: new Date(e.expense_date).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+      }),
+      fullDate: new Date(e.expense_date).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }),
+      amount: Number(e.amount ?? 0),
+      type: e.expense_type ?? "other",
+      description:
+        e.description ??
+        (e.fuel_details?.station_name
+          ? `Fuel @ ${e.fuel_details.station_name}`
+          : ""),
+      tripRef: e.trip_reference ?? "",
+    }));
+
+  const BAR_MIN_WIDTH = 32;
+  const chartPixelWidth = Math.max(
+    600,
+    expenseChartData.length * BAR_MIN_WIDTH,
+  );
 
   // Backend: { vehicle, costs: { fuel, maintenance, other_expenses, total_operational }, metrics: {...} }
   const costs = opCost.data?.costs;
@@ -128,7 +159,10 @@ function AnalyticsTab() {
 
   // Backend: { fill_ups: [...], average_efficiency_km_per_liter }
   const fuelData = (fuelEff.data?.fill_ups ?? [])
-    .filter((f) => f.efficiency_km_per_liter !== null && f.efficiency_km_per_liter > 0)
+    .filter(
+      (f) =>
+        f.efficiency_km_per_liter !== null && f.efficiency_km_per_liter > 0,
+    )
     .map((f) => ({
       ...f,
       label: f.expense_date
@@ -142,65 +176,111 @@ function AnalyticsTab() {
   const vehicleList = Array.isArray(vehicles.data?.vehicles)
     ? vehicles.data.vehicles
     : Array.isArray(vehicles.data)
-    ? vehicles.data
-    : [];
+      ? vehicles.data
+      : [];
 
   return (
     <div>
-      {/* Monthly Fleet Burn Rate */}
-      <Section title="Monthly Fleet Burn Rate">
-        {burnRate.isLoading ? (
-          <div className="h-64 flex items-center justify-center text-gray-600">Loading</div>
-        ) : burnData.length === 0 ? (
+      {/* All Expenses Chart */}
+      <Section title="All Expenses">
+        {/* Type filter + legend */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {["all", ...Object.keys(TYPE_COLORS)].map((t) => (
+            <button
+              key={t}
+              onClick={() => setChartType(t)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors border ${
+                chartType === t
+                  ? "border-indigo-500 bg-indigo-600/20 text-white"
+                  : "border-gray-700 bg-gray-900 text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              {t !== "all" && (
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: TYPE_COLORS[t] }}
+                />
+              )}
+              {t}
+            </button>
+          ))}
+          {expenseChartData.length > 0 && (
+            <span className="ml-auto text-xs text-gray-600">
+              {expenseChartData.length} expense
+              {expenseChartData.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+
+        {allExpenses.isLoading ? (
+          <div className="h-64 flex items-center justify-center text-gray-600">
+            Loading…
+          </div>
+        ) : expenseChartData.length === 0 ? (
           <EmptyState
-            title="No burn rate data"
+            title="No expenses"
             icon={TrendingUp}
-            description="Complete trips with expenses to see monthly trends."
+            description="Expenses from trips will appear here."
           />
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={burnData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="month" tick={{ fill: "#9ca3af", fontSize: 11 }} />
-              <YAxis
-                tick={{ fill: "#9ca3af", fontSize: 11 }}
-                tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12, color: "#9ca3af" }} />
-              <Line
-                type="monotone"
-                dataKey="trip_expenses"
-                stroke={CHART_COLORS.trip_expenses}
-                strokeWidth={2}
-                dot={false}
-                name="Trip Expenses"
-              />
-              <Line
-                type="monotone"
-                dataKey="maintenance"
-                stroke={CHART_COLORS.maintenance}
-                strokeWidth={2}
-                dot={false}
-                name="Maintenance"
-              />
-              <Line
-                type="monotone"
-                dataKey="total"
-                stroke={CHART_COLORS.total}
-                strokeWidth={2}
-                dot={false}
-                name="Total"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          /* Horizontally scrollable so bars never get squished */
+          <div className="overflow-x-auto pb-1">
+            <div style={{ width: chartPixelWidth, minWidth: "100%" }}>
+              <BarChart
+                width={chartPixelWidth}
+                height={320}
+                data={expenseChartData}
+                margin={{ top: 8, right: 16, left: 0, bottom: 64 }}
+                barSize={Math.min(
+                  28,
+                  Math.max(6, chartPixelWidth / expenseChartData.length - 6),
+                )}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#1f2937"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: "#6b7280", fontSize: 10 }}
+                  angle={-45}
+                  textAnchor="end"
+                  interval={0}
+                  height={60}
+                />
+                <YAxis
+                  tick={{ fill: "#6b7280", fontSize: 11 }}
+                  tickFormatter={(v) =>
+                    `₹${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`
+                  }
+                  width={56}
+                />
+                <Tooltip
+                  content={<ExpenseTooltip />}
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                />
+                <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                  {expenseChartData.map((entry, idx) => (
+                    <Cell
+                      key={idx}
+                      fill={TYPE_COLORS[entry.type] ?? "#6b7280"}
+                      fillOpacity={0.85}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </div>
+          </div>
         )}
       </Section>
 
       {/* Per-Vehicle Analysis */}
       <Section title="Per-Vehicle Analysis">
         <div className="mb-4">
-          <label className="block text-gray-500 text-xs mb-1">Select Vehicle</label>
+          <label className="block text-gray-500 text-xs mb-1">
+            Select Vehicle
+          </label>
           <select
             value={vehicleId}
             onChange={(e) => setVehicleId(e.target.value)}
@@ -209,7 +289,7 @@ function AnalyticsTab() {
             <option value="">— Pick a vehicle —</option>
             {vehicleList.map((v) => (
               <option key={v._id} value={v._id}>
-                {v.name}  {v.license_plate}
+                {v.name} {v.license_plate}
               </option>
             ))}
           </select>
@@ -217,7 +297,8 @@ function AnalyticsTab() {
 
         {!vehicleId && (
           <p className="text-gray-600 text-sm">
-            Select a vehicle above to see its operational cost and fuel efficiency.
+            Select a vehicle above to see its operational cost and fuel
+            efficiency.
           </p>
         )}
 
@@ -228,8 +309,12 @@ function AnalyticsTab() {
             {vehicleInfo && (
               <div className="flex items-center gap-2 mb-4 p-3 bg-gray-800/50 rounded-lg">
                 <Car size={16} className="text-indigo-400" />
-                <span className="text-white text-sm font-medium">{vehicleInfo.name}</span>
-                <span className="text-gray-500 text-xs font-mono">{vehicleInfo.license_plate}</span>
+                <span className="text-white text-sm font-medium">
+                  {vehicleInfo.name}
+                </span>
+                <span className="text-gray-500 text-xs font-mono">
+                  {vehicleInfo.license_plate}
+                </span>
                 {vehicleInfo.current_odometer != null && (
                   <span className="text-gray-600 text-xs ml-auto">
                     Odometer: {vehicleInfo.current_odometer.toLocaleString()} km
@@ -238,7 +323,9 @@ function AnalyticsTab() {
               </div>
             )}
 
-            <h4 className="text-gray-400 text-xs uppercase tracking-wide mb-3">Cost Breakdown</h4>
+            <h4 className="text-gray-400 text-xs uppercase tracking-wide mb-3">
+              Cost Breakdown
+            </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
               <KpiMini
                 label="Total Operational"
@@ -280,11 +367,15 @@ function AnalyticsTab() {
             <div className="flex flex-wrap gap-4 text-xs text-gray-500">
               <span>
                 Completed Trips:{" "}
-                <span className="text-gray-300">{metrics?.completed_trips ?? 0}</span>
+                <span className="text-gray-300">
+                  {metrics?.completed_trips ?? 0}
+                </span>
               </span>
               <span>
                 Maintenance Services:{" "}
-                <span className="text-gray-300">{metrics?.maintenance_services ?? 0}</span>
+                <span className="text-gray-300">
+                  {metrics?.maintenance_services ?? 0}
+                </span>
               </span>
               <span>
                 Total Distance:{" "}
@@ -297,7 +388,9 @@ function AnalyticsTab() {
         )}
 
         {vehicleId && !opCost.isLoading && !costs && !opCost.isError && (
-          <p className="text-gray-600 text-sm mt-2">No cost data found for this vehicle.</p>
+          <p className="text-gray-600 text-sm mt-2">
+            No cost data found for this vehicle.
+          </p>
         )}
 
         {vehicleId && opCost.isError && (
@@ -315,9 +408,15 @@ function AnalyticsTab() {
               )}
             </h4>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={fuelData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+              <BarChart
+                data={fuelData}
+                margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="label" tick={{ fill: "#9ca3af", fontSize: 11 }} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: "#9ca3af", fontSize: 11 }}
+                />
                 <YAxis tick={{ fill: "#9ca3af", fontSize: 11 }} />
                 <Tooltip content={<FuelTooltip />} />
                 <Bar
@@ -367,7 +466,10 @@ function ListTab() {
     <div>
       <div className="flex flex-wrap gap-3 mb-5">
         <div className="relative flex-1 min-w-48">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+          />
           <input
             placeholder="Search description or trip ref"
             value={search}
@@ -417,16 +519,22 @@ function ListTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-800">
-                {["Trip Ref", "Type", "Amount", "Description", "Date", "Vehicle", "Trip Status"].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-gray-500 font-medium text-xs uppercase tracking-wide"
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
+                {[
+                  "Trip Ref",
+                  "Type",
+                  "Amount",
+                  "Description",
+                  "Date",
+                  "Vehicle",
+                  "Trip Status",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-gray-500 font-medium text-xs uppercase tracking-wide"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -442,7 +550,8 @@ function ListTab() {
                     <span
                       className="px-2 py-0.5 rounded-full text-xs font-medium capitalize"
                       style={{
-                        backgroundColor: (TYPE_COLORS[e.expense_type] ?? "#6b7280") + "22",
+                        backgroundColor:
+                          (TYPE_COLORS[e.expense_type] ?? "#6b7280") + "22",
                         color: TYPE_COLORS[e.expense_type] ?? "#9ca3af",
                       }}
                     >
@@ -462,9 +571,13 @@ function ListTab() {
                     {fmtDate(e.expense_date)}
                   </td>
                   <td className="px-4 py-3 text-xs">
-                    <span className="text-gray-300">{e.vehicle?.name ?? "—"}</span>
+                    <span className="text-gray-300">
+                      {e.vehicle?.name ?? "—"}
+                    </span>
                     {e.vehicle?.license_plate && (
-                      <span className="block text-gray-600 font-mono">{e.vehicle.license_plate}</span>
+                      <span className="block text-gray-600 font-mono">
+                        {e.vehicle.license_plate}
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -473,8 +586,8 @@ function ListTab() {
                         e.trip_status === "completed"
                           ? "bg-emerald-900/50 text-emerald-400"
                           : e.trip_status === "in_transit"
-                          ? "bg-blue-900/50 text-blue-400"
-                          : "bg-gray-800 text-gray-400"
+                            ? "bg-blue-900/50 text-blue-400"
+                            : "bg-gray-800 text-gray-400"
                       }`}
                     >
                       {(e.trip_status ?? "—").replace(/_/g, " ")}
@@ -506,7 +619,9 @@ export default function Expenses() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-5 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              tab === t ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white"
+              tab === t
+                ? "bg-indigo-600 text-white"
+                : "text-gray-400 hover:text-white"
             }`}
           >
             {t}

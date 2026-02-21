@@ -41,9 +41,9 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800 flex flex-col z-30">
+    <aside className="fixed inset-y-0 left-0 w-52 bg-gray-900 border-r border-gray-800 flex flex-col z-30">
       {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b border-gray-800">
+      <div className="h-16 flex items-center px-4 border-b border-gray-800">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
             <Truck size={16} className="text-white" />

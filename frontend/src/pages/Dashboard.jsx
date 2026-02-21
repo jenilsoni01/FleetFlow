@@ -40,22 +40,47 @@ const STATUS_LABELS = {
 };
 
 function KpiCard({ icon: Icon, title, value, subtitle, color = "indigo" }) {
-  const colors = {
-    indigo: "text-indigo-400 bg-indigo-900/20",
-    emerald: "text-emerald-400 bg-emerald-900/20",
-    amber: "text-amber-400 bg-amber-900/20",
-    blue: "text-blue-400 bg-blue-900/20",
-    red: "text-red-400 bg-red-900/20",
+  const palettes = {
+    indigo: {
+      icon: "text-indigo-400",
+      bg: "bg-indigo-900/20",
+      border: "border-indigo-800/40",
+    },
+    emerald: {
+      icon: "text-emerald-400",
+      bg: "bg-emerald-900/20",
+      border: "border-emerald-800/40",
+    },
+    amber: {
+      icon: "text-amber-400",
+      bg: "bg-amber-900/20",
+      border: "border-amber-800/40",
+    },
+    blue: {
+      icon: "text-blue-400",
+      bg: "bg-blue-900/20",
+      border: "border-blue-800/40",
+    },
+    red: {
+      icon: "text-red-400",
+      bg: "bg-red-900/20",
+      border: "border-red-800/40",
+    },
   };
+  const p = palettes[color] ?? palettes.indigo;
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-start gap-4">
-      <div className={`p-2.5 rounded-lg ${colors[color] ?? colors.indigo}`}>
-        <Icon size={20} className={colors[color]?.split(" ")[0]} />
+    <div
+      className={`bg-gray-900 border border-gray-800 rounded-xl p-6 flex items-start gap-5`}
+    >
+      <div className={`p-3 rounded-xl ${p.bg} border ${p.border} shrink-0`}>
+        <Icon size={22} className={p.icon} />
       </div>
-      <div>
-        <p className="text-gray-500 text-xs mb-1">{title}</p>
-        <p className="text-white text-2xl font-bold leading-tight">{value}</p>
-        {subtitle && <p className="text-gray-600 text-xs mt-1">{subtitle}</p>}
+      <div className="min-w-0">
+        <p className="text-gray-500 text-xs uppercase tracking-wide mb-1">
+          {title}
+        </p>
+        <p className={`text-3xl font-bold leading-tight ${p.icon}`}>{value}</p>
+        {subtitle && <p className="text-gray-600 text-xs mt-1.5">{subtitle}</p>}
       </div>
     </div>
   );
@@ -63,12 +88,12 @@ function KpiCard({ icon: Icon, title, value, subtitle, color = "indigo" }) {
 
 function ChartCard({ title, icon: Icon, children, empty }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <h3 className="text-gray-400 text-xs uppercase tracking-widest font-semibold mb-5 flex items-center gap-2">
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+      <h3 className="text-gray-400 text-xs uppercase tracking-widest font-semibold mb-6 flex items-center gap-2">
         {Icon && <Icon size={13} />} {title}
       </h3>
       {empty ? (
-        <p className="text-gray-700 text-sm text-center py-8">No data yet</p>
+        <p className="text-gray-700 text-sm text-center py-12">No data yet</p>
       ) : (
         children
       )}
@@ -181,9 +206,9 @@ export default function Dashboard() {
       )}
 
       {data && (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* ── KPIs ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
             <KpiCard
               icon={Truck}
               title="Active Fleet (On Trip)"
@@ -214,15 +239,59 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* ── Charts row 1 ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Fleet Status Breakdown */}
+          {/* ── Charts row 1: Trip Volume (wide) + Fleet Breakdown (narrow) ── */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Weekly Trip Volume — spans 2 of 3 columns */}
+            <div className="xl:col-span-2">
+              <ChartCard
+                title="Weekly Trip Volume (Last 7 Days)"
+                icon={Route}
+                empty={weeklyVolumeLabelled.length === 0}
+              >
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart
+                    data={weeklyVolumeLabelled}
+                    margin={{ top: 4, right: 8, left: -16, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#1f2937"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "#6b7280", fontSize: 12 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: "#6b7280", fontSize: 12 }}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      content={<CustomTooltip suffix=" trips" />}
+                      cursor={{ fill: "rgba(99,102,241,0.08)" }}
+                    />
+                    <Bar
+                      dataKey="trips"
+                      fill="#6366f1"
+                      radius={[5, 5, 0, 0]}
+                      maxBarSize={56}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+
+            {/* Fleet Status Breakdown — spans 1 of 3 columns */}
             <ChartCard
               title="Fleet Status Breakdown"
               icon={Truck}
               empty={fleetBreakdown.length === 0}
             >
-              <div className="space-y-3">
+              <div className="space-y-5">
                 {fleetBreakdown.map((item) => {
                   const total = fleetBreakdown.reduce((s, x) => s + x.count, 0);
                   const pct =
@@ -230,15 +299,18 @@ export default function Dashboard() {
                   const color = STATUS_COLORS[item.status] ?? "#6b7280";
                   return (
                     <div key={item.status}>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-400">
+                      <div className="flex justify-between text-xs mb-2">
+                        <span className="text-gray-400 font-medium">
                           {STATUS_LABELS[item.status] ?? item.status}
                         </span>
-                        <span className="text-gray-300 font-medium">
-                          {item.count} ({pct}%)
+                        <span className="text-gray-300 font-semibold">
+                          {item.count}
+                          <span className="text-gray-600 font-normal ml-1">
+                            ({pct}%)
+                          </span>
                         </span>
                       </div>
-                      <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-2.5 bg-gray-800 rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all"
                           style={{ width: `${pct}%`, backgroundColor: color }}
@@ -249,137 +321,113 @@ export default function Dashboard() {
                 })}
               </div>
             </ChartCard>
-
-            {/* Weekly Trip Volume */}
-            <ChartCard
-              title="Weekly Trip Volume (Last 7 Days)"
-              icon={Route}
-              empty={weeklyVolumeLabelled.length === 0}
-            >
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart
-                  data={weeklyVolumeLabelled}
-                  margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#1f2937"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    content={<CustomTooltip suffix=" trips" />}
-                    cursor={{ fill: "rgba(99,102,241,0.1)" }}
-                  />
-                  <Bar dataKey="trips" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
           </div>
 
-          {/* ── Charts row 2 ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Fuel Spend Trend */}
-            <ChartCard
-              title="Fuel Spend Trend (Last 6 Months)"
-              icon={Fuel}
-              empty={fuelTrendLabelled.length === 0}
-            >
-              <ResponsiveContainer width="100%" height={180}>
-                <AreaChart
-                  data={fuelTrendLabelled}
-                  margin={{ top: 0, right: 0, left: -10, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="fuelGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#1f2937"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: "#6b7280", fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) =>
-                      v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`
-                    }
-                  />
-                  <Tooltip
-                    content={<CustomTooltip prefix="₹" />}
-                    cursor={{
-                      stroke: "#f59e0b",
-                      strokeWidth: 1,
-                      strokeDasharray: "3 3",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="totalFuelSpend"
-                    stroke="#f59e0b"
-                    strokeWidth={2}
-                    fill="url(#fuelGrad)"
-                    dot={{ fill: "#f59e0b", r: 3 }}
-                    name="Fuel Spend"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartCard>
+          {/* ── Charts row 2: Fuel Trend (wide) + Top Vehicles (narrow) ── */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Fuel Spend Trend — spans 2 of 3 columns */}
+            <div className="xl:col-span-2">
+              <ChartCard
+                title="Fuel Spend Trend (Last 6 Months)"
+                icon={Fuel}
+                empty={fuelTrendLabelled.length === 0}
+              >
+                <ResponsiveContainer width="100%" height={240}>
+                  <AreaChart
+                    data={fuelTrendLabelled}
+                    margin={{ top: 4, right: 8, left: -4, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="fuelGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                          offset="5%"
+                          stopColor="#f59e0b"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#f59e0b"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#1f2937"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "#6b7280", fontSize: 12 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: "#6b7280", fontSize: 12 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v) =>
+                        v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`
+                      }
+                    />
+                    <Tooltip
+                      content={<CustomTooltip prefix="₹" />}
+                      cursor={{
+                        stroke: "#f59e0b",
+                        strokeWidth: 1,
+                        strokeDasharray: "3 3",
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="totalFuelSpend"
+                      stroke="#f59e0b"
+                      strokeWidth={2.5}
+                      fill="url(#fuelGrad)"
+                      dot={{ fill: "#f59e0b", r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="Fuel Spend"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
 
-            {/* Top Vehicles by Distance */}
+            {/* Top Vehicles by Distance — spans 1 of 3 columns */}
             <ChartCard
               title="Top Vehicles by Distance (This Month)"
               icon={TrendingUp}
               empty={topVehicles.length === 0}
             >
-              <div className="space-y-3">
+              <div className="space-y-5">
                 {topVehicles.map((v, i) => {
                   const max = topVehicles[0]?.totalDistance ?? 1;
                   const pct =
                     max > 0 ? Math.round((v.totalDistance / max) * 100) : 0;
                   return (
                     <div key={v.vehicle_id ?? i}>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-300">
+                      <div className="flex justify-between text-xs mb-2">
+                        <span className="text-gray-300 font-medium truncate max-w-[55%]">
                           {v.name ?? "Unknown"}
                           {v.license_plate && (
-                            <span className="text-gray-600 ml-1.5 font-mono">
+                            <span className="text-gray-600 ml-1.5 font-mono text-[10px]">
                               {v.license_plate}
                             </span>
                           )}
                         </span>
-                        <span className="text-gray-400">
-                          {(v.totalDistance ?? 0).toLocaleString()} km ·{" "}
-                          {v.tripsCompleted} trips
+                        <span className="text-gray-500 text-right shrink-0">
+                          {(v.totalDistance ?? 0).toLocaleString()} km
                         </span>
                       </div>
-                      <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-2.5 bg-gray-800 rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full bg-emerald-500 transition-all"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
+                      <p className="text-gray-700 text-[10px] mt-1">
+                        {v.tripsCompleted} trips completed
+                      </p>
                     </div>
                   );
                 })}
