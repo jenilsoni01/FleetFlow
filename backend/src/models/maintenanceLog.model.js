@@ -93,6 +93,13 @@ const maintenanceLogSchema = new mongoose.Schema(
 
     service_provider: { type: String, trim: true, default: "" },
 
+    // Stored when we flip vehicle.status → "in_shop" so we can restore on cancel
+    previous_vehicle_status: {
+      type: String,
+      enum: ["available", "on_trip", "in_shop", "out_of_service"],
+      default: "available",
+    },
+
     status: {
       type: String,
       enum: {
