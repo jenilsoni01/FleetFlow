@@ -6,13 +6,16 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import { PageSpinner } from "../components/ui/Spinner";
+import { FormField, InputField, SelectField } from "../components/ui/FormField";
 import { useToast } from "../context/ToastContext";
+import { MAINTENANCE_RULES, validateMaintenance } from "../utils/validate";
 import {
   getMaintenanceLogs,
   createMaintenanceLog,
   updateMaintenanceLog,
   deleteMaintenanceLog,
 } from "../services/maintenance.service";
+import { getVehicles } from "../services/vehicles.service";
 
 const STATUS_FILTERS = [
   "all",
@@ -22,17 +25,17 @@ const STATUS_FILTERS = [
   "cancelled",
 ];
 const SERVICE_TYPES = [
-  "preventive",
-  "corrective",
-  "inspection",
-  "tire_change",
   "oil_change",
+  "tire_replacement",
   "brake_service",
+  "engine_repair",
+  "body_work",
+  "inspection",
   "other",
 ];
 const EMPTY = {
   vehicle_id: "",
-  service_type: "preventive",
+  service_type: "oil_change",
   description: "",
   cost: "",
   scheduled_date: "",
@@ -45,6 +48,8 @@ export default function Maintenance() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const toast = useToast();
   const qc = useQueryClient();
 
@@ -54,6 +59,15 @@ export default function Maintenance() {
     queryFn: () => getMaintenanceLogs(params),
     staleTime: 30_000,
   });
+
+  const { data: vehiclesData } = useQuery({
+    queryKey: ["vehicles", {}],
+    queryFn: () => getVehicles({}),
+    staleTime: 60_000,
+  });
+  const vehicleOptions = (vehiclesData?.vehicles ?? vehiclesData ?? []).map(
+    (v) => ({ value: v._id, label: `${v.name} — ${v.license_plate}` }),
+  );
 
   const logs = (data?.logs ?? data ?? []).filter((l) =>
     search
@@ -70,6 +84,8 @@ export default function Maintenance() {
       toast.success("Log created");
       setShowCreate(false);
       setForm(EMPTY);
+      setErrors({});
+      setTouched({});
       inv();
     },
     onError: (e) =>
@@ -81,6 +97,8 @@ export default function Maintenance() {
     onSuccess: () => {
       toast.success("Log updated");
       setEditing(null);
+      setErrors({});
+      setTouched({});
       inv();
     },
     onError: (e) =>
@@ -97,11 +115,20 @@ export default function Maintenance() {
       toast.error(e.response?.data?.message ?? "Failed to delete"),
   });
 
+  const openCreate = () => {
+    setForm(EMPTY);
+    setErrors({});
+    setTouched({});
+    setShowCreate(true);
+  };
+
   const openEdit = (l) => {
     setEditing(l);
+    setErrors({});
+    setTouched({});
     setForm({
       vehicle_id: l.vehicle?._id ?? "",
-      service_type: l.service_type ?? "other",
+      service_type: l.service_type ?? "oil_change",
       description: l.description ?? "",
       cost: l.cost ?? "",
       scheduled_date: l.dates?.scheduled?.split("T")[0] ?? "",
@@ -109,7 +136,48 @@ export default function Maintenance() {
       status: l.status,
     });
   };
-  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const setF = (k, val) => {
+    const next = { ...form, [k]: val };
+    setForm(next);
+    if (touched[k]) {
+      const e = validateMaintenance(next);
+      setErrors((prev) => ({ ...prev, [k]: e[k] }));
+    }
+  };
+
+  const blur = (k) => {
+    setTouched((t) => ({ ...t, [k]: true }));
+    const e = validateMaintenance(form);
+    setErrors((prev) => ({ ...prev, [k]: e[k] }));
+  };
+
+  const handleSave = (isEdit) => {
+    const allTouched = Object.fromEntries(
+      Object.keys(MAINTENANCE_RULES).map((k) => [k, true]),
+    );
+    setTouched(allTouched);
+    const e = validateMaintenance(form);
+    setErrors(e);
+    if (Object.keys(e).length > 0) {
+      toast.error("Please fix the validation errors before saving.");
+      return;
+    }
+    const payload = {
+      vehicle_id: form.vehicle_id,
+      service_type: form.service_type,
+      description: form.description || undefined,
+      cost: form.cost ? Number(form.cost) : undefined,
+      scheduled_date: form.scheduled_date,
+      technician_name: form.technician_name || undefined,
+      ...(isEdit && form.status && { status: form.status }),
+    };
+    if (isEdit) {
+      updateMut.mutate({ id: editing._id, data: payload });
+    } else {
+      createMut.mutate(payload);
+    }
+  };
 
   return (
     <AppLayout title="Maintenance">
@@ -138,7 +206,7 @@ export default function Maintenance() {
           ))}
         </div>
         <button
-          onClick={() => setShowCreate(true)}
+          onClick={openCreate}
           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Plus size={16} /> New Log
@@ -237,131 +305,233 @@ export default function Maintenance() {
       )}
 
       {/* Create / Edit Modal */}
-      {[
-        {
-          open: showCreate,
-          onClose: () => setShowCreate(false),
-          title: "New Maintenance Log",
-          onSave: () => createMut.mutate(form),
-          loading: createMut.isPending,
-        },
-        {
-          open: !!editing,
-          onClose: () => setEditing(null),
-          title: "Edit Log",
-          onSave: () => updateMut.mutate({ id: editing._id, data: form }),
-          loading: updateMut.isPending,
-        },
-      ].map(({ open, onClose, title, onSave, loading }, i) => (
-        <Modal key={i} open={open} onClose={onClose} title={title}>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-400 text-xs mb-1">
-                Vehicle ID
-              </label>
-              <input
-                value={form.vehicle_id}
-                onChange={(e) => setF("vehicle_id", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-400 text-xs mb-1">
-                Service Type
-              </label>
-              <select
-                value={form.service_type}
-                onChange={(e) => setF("service_type", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-              >
-                {SERVICE_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-gray-400 text-xs mb-1">
-                Cost (₹)
-              </label>
-              <input
-                type="number"
-                value={form.cost}
-                onChange={(e) => setF("cost", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-gray-400 text-xs mb-1">
-                Scheduled Date
-              </label>
-              <input
-                type="date"
-                value={form.scheduled_date}
-                onChange={(e) => setF("scheduled_date", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-gray-400 text-xs mb-1">
-                Technician Name
-              </label>
-              <input
-                value={form.technician_name}
-                onChange={(e) => setF("technician_name", e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-gray-400 text-xs mb-1">
-                Description
-              </label>
+      {/* Create Modal */}
+      <Modal
+        open={showCreate}
+        onClose={() => {
+          setShowCreate(false);
+          setErrors({});
+          setTouched({});
+        }}
+        title="New Maintenance Log"
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <div onBlur={() => blur("vehicle_id")}>
+            <SelectField
+              label="Vehicle"
+              name="vehicle_id"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              options={vehicleOptions}
+              required
+            />
+          </div>
+          <div onBlur={() => blur("service_type")}>
+            <SelectField
+              label="Service Type"
+              name="service_type"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              required
+              options={SERVICE_TYPES.map((t) => ({
+                value: t,
+                label: t.replace(/_/g, " "),
+              }))}
+            />
+          </div>
+          <div onBlur={() => blur("scheduled_date")}>
+            <InputField
+              label="Scheduled Date"
+              name="scheduled_date"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              type="date"
+              required
+            />
+          </div>
+          <InputField
+            label="Cost (₹)"
+            name="cost"
+            form={form}
+            errors={errors}
+            onChange={setF}
+            type="number"
+            min={0}
+            step="0.01"
+          />
+          <div className="col-span-2">
+            <InputField
+              label="Technician Name"
+              name="technician_name"
+              form={form}
+              errors={errors}
+              onChange={setF}
+            />
+          </div>
+          <div className="col-span-2" onBlur={() => blur("description")}>
+            <FormField
+              label={`Description${form.service_type === "other" ? " *" : ""}`}
+              error={errors.description}
+            >
               <textarea
                 value={form.description}
                 onChange={(e) => setF("description", e.target.value)}
                 rows={2}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500 resize-none"
+                className={`w-full bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none resize-none border ${errors.description ? "border-red-500" : "border-gray-700 focus:border-indigo-500"}`}
+                placeholder={
+                  form.service_type === "other"
+                    ? 'Required for "Other" service type'
+                    : "Optional notes..."
+                }
+              />
+            </FormField>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            onClick={() => {
+              setShowCreate(false);
+              setErrors({});
+              setTouched({});
+            }}
+            className="px-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => handleSave(false)}
+            disabled={createMut.isPending}
+            className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-60 transition-colors"
+          >
+            {createMut.isPending ? "Saving..." : "Create Log"}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        open={!!editing}
+        onClose={() => {
+          setEditing(null);
+          setErrors({});
+          setTouched({});
+        }}
+        title="Edit Log"
+      >
+        {editing && (
+          <div className="grid grid-cols-2 gap-4">
+            <div onBlur={() => blur("vehicle_id")}>
+              <SelectField
+                label="Vehicle"
+                name="vehicle_id"
+                form={form}
+                errors={errors}
+                onChange={setF}
+                options={vehicleOptions}
+                required
               />
             </div>
-            {editing && (
-              <div>
-                <label className="block text-gray-400 text-xs mb-1">
-                  Status
-                </label>
-                <select
-                  value={form.status ?? editing.status}
-                  onChange={(e) => setF("status", e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-                >
-                  {["pending", "in_progress", "completed", "cancelled"].map(
-                    (s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </div>
-            )}
+            <div onBlur={() => blur("service_type")}>
+              <SelectField
+                label="Service Type"
+                name="service_type"
+                form={form}
+                errors={errors}
+                onChange={setF}
+                required
+                options={SERVICE_TYPES.map((t) => ({
+                  value: t,
+                  label: t.replace(/_/g, " "),
+                }))}
+              />
+            </div>
+            <div onBlur={() => blur("scheduled_date")}>
+              <InputField
+                label="Scheduled Date"
+                name="scheduled_date"
+                form={form}
+                errors={errors}
+                onChange={setF}
+                type="date"
+                required
+              />
+            </div>
+            <InputField
+              label="Cost (₹)"
+              name="cost"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              type="number"
+              min={0}
+              step="0.01"
+            />
+            <InputField
+              label="Technician Name"
+              name="technician_name"
+              form={form}
+              errors={errors}
+              onChange={setF}
+            />
+            <div>
+              <label className="block text-gray-400 text-xs mb-1">Status</label>
+              <select
+                value={form.status ?? editing.status}
+                onChange={(e) => setF("status", e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
+              >
+                {["pending", "in_progress", "completed", "cancelled"].map(
+                  (s) => (
+                    <option key={s} value={s}>
+                      {s.replace("_", " ")}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+            <div className="col-span-2" onBlur={() => blur("description")}>
+              <FormField
+                label={`Description${form.service_type === "other" ? " *" : ""}`}
+                error={errors.description}
+              >
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setF("description", e.target.value)}
+                  rows={2}
+                  className={`w-full bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none resize-none border ${errors.description ? "border-red-500" : "border-gray-700 focus:border-indigo-500"}`}
+                  placeholder={
+                    form.service_type === "other"
+                      ? 'Required for "Other" service type'
+                      : "Optional..."
+                  }
+                />
+              </FormField>
+            </div>
           </div>
-          <div className="flex justify-end gap-3 mt-6">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onSave}
-              disabled={loading}
-              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-60 transition-colors"
-            >
-              {loading ? "Saving..." : "Save"}
-            </button>
-          </div>
-        </Modal>
-      ))}
+        )}
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            onClick={() => {
+              setEditing(null);
+              setErrors({});
+              setTouched({});
+            }}
+            className="px-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => handleSave(true)}
+            disabled={updateMut.isPending}
+            className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-60 transition-colors"
+          >
+            {updateMut.isPending ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </Modal>
     </AppLayout>
   );
 }

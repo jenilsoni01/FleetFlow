@@ -3,7 +3,6 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { ApiError } from "./utils/ApiError.js";
 
-
 import authRouter from "./routes/auth.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import maintenanceRouter from "./routes/maintenance.routes.js";
@@ -11,7 +10,7 @@ import vehicleRouter from "./routes/vehicle.routes.js";
 import tripRouter from "./routes/trip.routes.js";
 import expenseRouter from "./routes/expense.routes.js";
 import driverRouter from "./routes/driver.routes.js";
-
+import metaRouter from "./routes/meta.routes.js";
 
 import "./models/user.model.js";
 import "./models/vehicleType.model.js";
@@ -44,7 +43,7 @@ app.use("/api/vehicles", vehicleRouter);
 app.use("/api/trips", tripRouter);
 app.use("/api/expenses", expenseRouter);
 app.use("/api/drivers", driverRouter);
-
+app.use("/api/meta", metaRouter);
 
 app.use((err, req, res, next) => {
   const statusCode = err instanceof ApiError ? err.statusCode : 500;

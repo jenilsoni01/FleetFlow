@@ -18,6 +18,8 @@ import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import { PageSpinner } from "../components/ui/Spinner";
 import { useToast } from "../context/ToastContext";
+import { InputField, SelectField } from "../components/ui/FormField";
+import { validate, DRIVER_RULES } from "../utils/validate";
 import {
   getDrivers,
   createDriver,
@@ -27,6 +29,8 @@ import {
   suspendDriver,
   getDriverPerformance,
 } from "../services/drivers.service";
+
+const LICENSE_CATEGORIES = ["A", "B", "C", "D", "BE", "CE"];
 
 const STATUS_FILTERS = ["all", "on_duty", "off_duty", "on_trip", "suspended"];
 const EMPTY = {
@@ -44,6 +48,8 @@ export default function Drivers() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const [suspendModal, setSuspendModal] = useState(null);
   const [suspendReason, setSuspendReason] = useState("");
   const [perfModal, setPerfModal] = useState(null);
@@ -72,6 +78,8 @@ export default function Drivers() {
       toast.success("Driver created");
       setShowCreate(false);
       setForm(EMPTY);
+      setErrors({});
+      setTouched({});
       inv();
     },
     onError: (e) =>
@@ -83,6 +91,8 @@ export default function Drivers() {
     onSuccess: () => {
       toast.success("Driver updated");
       setEditing(null);
+      setErrors({});
+      setTouched({});
       inv();
     },
     onError: (e) =>
@@ -130,27 +140,69 @@ export default function Drivers() {
     staleTime: 60_000,
   });
 
+  const openCreate = () => {
+    setForm(EMPTY);
+    setErrors({});
+    setTouched({});
+    setShowCreate(true);
+  };
+
   const openEdit = (d) => {
     setEditing(d);
+    setErrors({});
+    setTouched({});
     setForm({
-      name: d.name,
-      employee_id: d.employee_id,
-      license_number: d.license_number,
-      license_category: d.license_category,
+      name: d.name ?? "",
+      employee_id: d.employee_id ?? "",
+      license_number: d.license_number ?? "",
+      license_category: d.license_category ?? "B",
       license_expiry: d.license_expiry?.split("T")[0] ?? "",
       date_of_joining: d.date_of_joining?.split("T")[0] ?? "",
     });
   };
-  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const formFields = [
-    { label: "Full Name", key: "name" },
-    { label: "Employee ID", key: "employee_id" },
-    { label: "License Number", key: "license_number" },
-    { label: "License Category", key: "license_category" },
-    { label: "License Expiry", key: "license_expiry", type: "date" },
-    { label: "Date of Joining", key: "date_of_joining", type: "date" },
-  ];
+  const setF = (k, val) => {
+    const next = { ...form, [k]: val };
+    if (k === "employee_id" || k === "license_number")
+      next[k] = val.toUpperCase();
+    setForm(next);
+    if (touched[k]) {
+      const e = validate(DRIVER_RULES, next);
+      setErrors((prev) => ({ ...prev, [k]: e[k] }));
+    }
+  };
+
+  const blur = (k) => {
+    setTouched((t) => ({ ...t, [k]: true }));
+    const e = validate(DRIVER_RULES, form);
+    setErrors((prev) => ({ ...prev, [k]: e[k] }));
+  };
+
+  const handleSave = (isEdit) => {
+    const allTouched = Object.fromEntries(
+      Object.keys(DRIVER_RULES).map((k) => [k, true]),
+    );
+    setTouched(allTouched);
+    const e = validate(DRIVER_RULES, form);
+    setErrors(e);
+    if (Object.keys(e).length > 0) {
+      toast.error("Please fix the validation errors before saving.");
+      return;
+    }
+    const payload = {
+      name: form.name.trim(),
+      employee_id: form.employee_id.trim().toUpperCase(),
+      license_number: form.license_number.trim().toUpperCase(),
+      license_category: form.license_category,
+      license_expiry: form.license_expiry,
+      date_of_joining: form.date_of_joining,
+    };
+    if (isEdit) {
+      updateMut.mutate({ id: editing._id, data: payload });
+    } else {
+      createMut.mutate(payload);
+    }
+  };
 
   return (
     <AppLayout title="Drivers">
@@ -179,7 +231,7 @@ export default function Drivers() {
           ))}
         </div>
         <button
-          onClick={() => setShowCreate(true)}
+          onClick={openCreate}
           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Plus size={16} /> Add Driver
@@ -326,55 +378,208 @@ export default function Drivers() {
       )}
 
       {/* Create / Edit Modal */}
-      {[
-        {
-          open: showCreate,
-          onClose: () => setShowCreate(false),
-          title: "Add Driver",
-          onSave: () => createMut.mutate(form),
-          loading: createMut.isPending,
-        },
-        {
-          open: !!editing,
-          onClose: () => setEditing(null),
-          title: "Edit Driver",
-          onSave: () => updateMut.mutate({ id: editing._id, data: form }),
-          loading: updateMut.isPending,
-        },
-      ].map(({ open, onClose, title, onSave, loading }, i) => (
-        <Modal key={i} open={open} onClose={onClose} title={title}>
+      {/* Create Modal */}
+      <Modal
+        open={showCreate}
+        onClose={() => {
+          setShowCreate(false);
+          setErrors({});
+          setTouched({});
+        }}
+        title="Add Driver"
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <div onBlur={() => blur("name")}>
+            <InputField
+              label="Full Name"
+              name="name"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              required
+              placeholder="e.g. Ramesh Kumar"
+            />
+          </div>
+          <div onBlur={() => blur("employee_id")}>
+            <InputField
+              label="Employee ID"
+              name="employee_id"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              required
+              placeholder="e.g. EMP001"
+            />
+          </div>
+          <div onBlur={() => blur("license_number")}>
+            <InputField
+              label="License Number"
+              name="license_number"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              required
+              placeholder="e.g. MH1420240012345"
+            />
+          </div>
+          <div onBlur={() => blur("license_category")}>
+            <SelectField
+              label="License Category"
+              name="license_category"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              required
+              options={LICENSE_CATEGORIES.map((c) => ({
+                value: c,
+                label: `Category ${c}`,
+              }))}
+            />
+          </div>
+          <div onBlur={() => blur("license_expiry")}>
+            <InputField
+              label="License Expiry"
+              name="license_expiry"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              type="date"
+              required
+            />
+          </div>
+          <div onBlur={() => blur("date_of_joining")}>
+            <InputField
+              label="Date of Joining"
+              name="date_of_joining"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              type="date"
+              required
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            onClick={() => {
+              setShowCreate(false);
+              setErrors({});
+              setTouched({});
+            }}
+            className="px-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => handleSave(false)}
+            disabled={createMut.isPending}
+            className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-60 transition-colors"
+          >
+            {createMut.isPending ? "Saving..." : "Add Driver"}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        open={!!editing}
+        onClose={() => {
+          setEditing(null);
+          setErrors({});
+          setTouched({});
+        }}
+        title="Edit Driver"
+      >
+        {editing && (
           <div className="grid grid-cols-2 gap-4">
-            {formFields.map(({ label, key, type = "text" }) => (
-              <div key={key}>
-                <label className="block text-gray-400 text-xs mb-1">
-                  {label}
-                </label>
-                <input
-                  type={type}
-                  value={form[key]}
-                  onChange={(e) => setF(key, e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            ))}
+            <div onBlur={() => blur("name")}>
+              <InputField
+                label="Full Name"
+                name="name"
+                form={form}
+                errors={errors}
+                onChange={setF}
+                required
+              />
+            </div>
+            <div onBlur={() => blur("employee_id")}>
+              <InputField
+                label="Employee ID"
+                name="employee_id"
+                form={form}
+                errors={errors}
+                onChange={setF}
+                required
+              />
+            </div>
+            <div onBlur={() => blur("license_number")}>
+              <InputField
+                label="License Number"
+                name="license_number"
+                form={form}
+                errors={errors}
+                onChange={setF}
+                required
+              />
+            </div>
+            <div onBlur={() => blur("license_category")}>
+              <SelectField
+                label="License Category"
+                name="license_category"
+                form={form}
+                errors={errors}
+                onChange={setF}
+                required
+                options={LICENSE_CATEGORIES.map((c) => ({
+                  value: c,
+                  label: `Category ${c}`,
+                }))}
+              />
+            </div>
+            <div onBlur={() => blur("license_expiry")}>
+              <InputField
+                label="License Expiry"
+                name="license_expiry"
+                form={form}
+                errors={errors}
+                onChange={setF}
+                type="date"
+                required
+              />
+            </div>
+            <div onBlur={() => blur("date_of_joining")}>
+              <InputField
+                label="Date of Joining"
+                name="date_of_joining"
+                form={form}
+                errors={errors}
+                onChange={setF}
+                type="date"
+                required
+              />
+            </div>
           </div>
-          <div className="flex justify-end gap-3 mt-6">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onSave}
-              disabled={loading}
-              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-60 transition-colors"
-            >
-              {loading ? "Saving..." : "Save"}
-            </button>
-          </div>
-        </Modal>
-      ))}
+        )}
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            onClick={() => {
+              setEditing(null);
+              setErrors({});
+              setTouched({});
+            }}
+            className="px-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => handleSave(true)}
+            disabled={updateMut.isPending}
+            className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-60 transition-colors"
+          >
+            {updateMut.isPending ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </Modal>
 
       {/* Suspend Modal */}
       <Modal

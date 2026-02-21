@@ -15,7 +15,9 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import { PageSpinner } from "../components/ui/Spinner";
+import { FormField, InputField, SelectField } from "../components/ui/FormField";
 import { useToast } from "../context/ToastContext";
+import { TRIP_RULES, validateTrip } from "../utils/validate";
 import {
   getTrips,
   createTrip,
@@ -24,6 +26,8 @@ import {
   completeTrip,
   cancelTrip,
 } from "../services/trips.service";
+import { getVehicles } from "../services/vehicles.service";
+import { getDrivers } from "../services/drivers.service";
 import { useNavigate } from "react-router-dom";
 
 const STATUS_FILTERS = [
@@ -35,13 +39,23 @@ const STATUS_FILTERS = [
   "cancelled",
 ];
 
+const PRIORITY_OPTIONS = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "urgent", label: "Urgent" },
+];
+
 const EMPTY_FORM = {
-  origin_address: "",
-  destination_address: "",
+  origin: "",
+  destination: "",
   driver_id: "",
   vehicle_id: "",
   scheduled_departure: "",
-  scheduled_arrival: "",
+  estimated_arrival: "",
+  cargo_description: "",
+  cargo_weight_kg: "",
+  priority: "medium",
   notes: "",
 };
 
@@ -50,6 +64,8 @@ export default function Trips() {
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const [actionModal, setActionModal] = useState(null); // { type, trip }
   const [cancelReason, setCancelReason] = useState("");
   const toast = useToast();
@@ -62,6 +78,24 @@ export default function Trips() {
     queryFn: () => getTrips(params),
     staleTime: 30_000,
   });
+
+  const { data: vehiclesData } = useQuery({
+    queryKey: ["vehicles", {}],
+    queryFn: () => getVehicles({}),
+    staleTime: 60_000,
+  });
+  const { data: driversData } = useQuery({
+    queryKey: ["drivers", {}],
+    queryFn: () => getDrivers({}),
+    staleTime: 60_000,
+  });
+
+  const vehicleOptions = (vehiclesData?.vehicles ?? vehiclesData ?? [])
+    .filter((v) => v.status === "available" || v.status === "in_shop")
+    .map((v) => ({ value: v._id, label: `${v.name} — ${v.license_plate}` }));
+  const driverOptions = (driversData?.drivers ?? driversData ?? [])
+    .filter((d) => d.status === "on_duty" || d.status === "off_duty")
+    .map((d) => ({ value: d._id, label: `${d.name} (${d.employee_id})` }));
 
   const trips = (data?.trips ?? data ?? []).filter((t) =>
     search
@@ -79,6 +113,8 @@ export default function Trips() {
       toast.success("Trip created");
       setShowCreate(false);
       setForm(EMPTY_FORM);
+      setErrors({});
+      setTouched({});
       invalidate();
     },
     onError: (e) =>
@@ -108,7 +144,47 @@ export default function Trips() {
     actionMut.mutate({ type, id: trip._id, payload });
   };
 
-  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setF = (k, val) => {
+    const next = { ...form, [k]: val };
+    setForm(next);
+    if (touched[k]) {
+      const e = validateTrip(next);
+      setErrors((prev) => ({ ...prev, [k]: e[k] }));
+    }
+  };
+
+  const blur = (k) => {
+    setTouched((t) => ({ ...t, [k]: true }));
+    const e = validateTrip(form);
+    setErrors((prev) => ({ ...prev, [k]: e[k] }));
+  };
+
+  const handleCreate = () => {
+    const allTouched = Object.fromEntries(
+      Object.keys(TRIP_RULES).map((k) => [k, true]),
+    );
+    setTouched(allTouched);
+    const e = validateTrip(form);
+    setErrors(e);
+    if (Object.keys(e).length > 0) {
+      toast.error("Please fix the validation errors before saving.");
+      return;
+    }
+    createMut.mutate({
+      origin: form.origin.trim(),
+      destination: form.destination.trim(),
+      vehicle_id: form.vehicle_id,
+      driver_id: form.driver_id || undefined,
+      scheduled_departure: form.scheduled_departure || undefined,
+      estimated_arrival: form.estimated_arrival || undefined,
+      cargo_description: form.cargo_description || undefined,
+      cargo_weight_kg: form.cargo_weight_kg
+        ? Number(form.cargo_weight_kg)
+        : undefined,
+      priority: form.priority || undefined,
+      notes: form.notes || undefined,
+    });
+  };
 
   return (
     <AppLayout title="Trips">
@@ -274,71 +350,126 @@ export default function Trips() {
       {/* Create Modal */}
       <Modal
         open={showCreate}
-        onClose={() => setShowCreate(false)}
+        onClose={() => {
+          setShowCreate(false);
+          setErrors({});
+          setTouched({});
+        }}
         title="Create New Trip"
         size="lg"
       >
         <div className="grid grid-cols-2 gap-4">
-          {[
-            { label: "Origin Address", key: "origin_address" },
-            { label: "Destination Address", key: "destination_address" },
-            { label: "Driver ID", key: "driver_id" },
-            { label: "Vehicle ID", key: "vehicle_id" },
-          ].map(({ label, key }) => (
-            <div key={key}>
-              <label className="block text-gray-400 text-xs mb-1">
-                {label}
-              </label>
-              <input
-                value={form[key]}
-                onChange={(e) => setF(key, e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-          ))}
-          {[
-            {
-              label: "Scheduled Departure",
-              key: "scheduled_departure",
-              type: "datetime-local",
-            },
-            {
-              label: "Scheduled Arrival",
-              key: "scheduled_arrival",
-              type: "datetime-local",
-            },
-          ].map(({ label, key, type }) => (
-            <div key={key}>
-              <label className="block text-gray-400 text-xs mb-1">
-                {label}
-              </label>
-              <input
-                type={type}
-                value={form[key]}
-                onChange={(e) => setF(key, e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-          ))}
-          <div className="col-span-2">
-            <label className="block text-gray-400 text-xs mb-1">Notes</label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => setF("notes", e.target.value)}
-              rows={2}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500 resize-none"
+          <div onBlur={() => blur("origin")}>
+            <InputField
+              label="Origin"
+              name="origin"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              required
+              placeholder="e.g. Mumbai Warehouse"
             />
+          </div>
+          <div onBlur={() => blur("destination")}>
+            <InputField
+              label="Destination"
+              name="destination"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              required
+              placeholder="e.g. Pune Depot"
+            />
+          </div>
+          <div onBlur={() => blur("vehicle_id")}>
+            <SelectField
+              label="Vehicle"
+              name="vehicle_id"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              options={vehicleOptions}
+              required
+            />
+          </div>
+          <SelectField
+            label="Driver (optional)"
+            name="driver_id"
+            form={form}
+            errors={errors}
+            onChange={setF}
+            options={driverOptions}
+          />
+          <div onBlur={() => blur("scheduled_departure")}>
+            <InputField
+              label="Scheduled Departure"
+              name="scheduled_departure"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              type="datetime-local"
+            />
+          </div>
+          <div onBlur={() => blur("estimated_arrival")}>
+            <InputField
+              label="Estimated Arrival"
+              name="estimated_arrival"
+              form={form}
+              errors={errors}
+              onChange={setF}
+              type="datetime-local"
+            />
+          </div>
+          <InputField
+            label="Cargo Description"
+            name="cargo_description"
+            form={form}
+            errors={errors}
+            onChange={setF}
+            placeholder="e.g. Electronics"
+          />
+          <InputField
+            label="Cargo Weight (kg)"
+            name="cargo_weight_kg"
+            form={form}
+            errors={errors}
+            onChange={setF}
+            type="number"
+            min={0}
+            step="0.1"
+          />
+          <SelectField
+            label="Priority"
+            name="priority"
+            form={form}
+            errors={errors}
+            onChange={setF}
+            options={PRIORITY_OPTIONS}
+          />
+          <div className="col-span-2">
+            <FormField label="Notes">
+              <textarea
+                value={form.notes}
+                onChange={(e) => setF("notes", e.target.value)}
+                rows={2}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500 resize-none"
+              />
+            </FormField>
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <button
-            onClick={() => setShowCreate(false)}
+            onClick={() => {
+              setShowCreate(false);
+              setErrors({});
+              setTouched({});
+            }}
             className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-gray-700 rounded-lg hover:border-gray-500 transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={() => createMut.mutate(form)}
+            onClick={handleCreate}
             disabled={createMut.isPending}
             className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-60"
           >

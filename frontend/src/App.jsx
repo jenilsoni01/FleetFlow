@@ -18,6 +18,8 @@ import Vehicles from "./pages/Vehicles";
 import Drivers from "./pages/Drivers";
 import Maintenance from "./pages/Maintenance";
 import Expenses from "./pages/Expenses";
+import Unauthorized from "./pages/Unauthorized";
+import { ROUTE_ROLES } from "./config/roles";
 import "./App.css";
 
 const queryClient = new QueryClient({
@@ -39,10 +41,11 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={ROUTE_ROLES["/dashboard"]}>
                     <Dashboard />
                   </ProtectedRoute>
                 }
@@ -50,7 +53,7 @@ function App() {
               <Route
                 path="/trips"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={ROUTE_ROLES["/trips"]}>
                     <Trips />
                   </ProtectedRoute>
                 }
@@ -58,7 +61,7 @@ function App() {
               <Route
                 path="/trips/:id"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={ROUTE_ROLES["/trips/:id"]}>
                     <TripDetail />
                   </ProtectedRoute>
                 }
@@ -66,7 +69,7 @@ function App() {
               <Route
                 path="/vehicles"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={ROUTE_ROLES["/vehicles"]}>
                     <Vehicles />
                   </ProtectedRoute>
                 }
@@ -74,7 +77,7 @@ function App() {
               <Route
                 path="/drivers"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={ROUTE_ROLES["/drivers"]}>
                     <Drivers />
                   </ProtectedRoute>
                 }
@@ -82,7 +85,7 @@ function App() {
               <Route
                 path="/maintenance"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={ROUTE_ROLES["/maintenance"]}>
                     <Maintenance />
                   </ProtectedRoute>
                 }
@@ -90,7 +93,7 @@ function App() {
               <Route
                 path="/expenses"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={ROUTE_ROLES["/expenses"]}>
                     <Expenses />
                   </ProtectedRoute>
                 }

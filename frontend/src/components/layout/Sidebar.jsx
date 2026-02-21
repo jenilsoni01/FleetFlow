@@ -11,8 +11,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { NAV_ROLES, ROLE_META } from "../../config/roles";
 
-const navItems = [
+const ALL_NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/trips", icon: Route, label: "Trips" },
   { to: "/vehicles", icon: Truck, label: "Vehicles" },
@@ -24,6 +25,13 @@ const navItems = [
 export default function Sidebar() {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const role = user?.role ?? "";
+  const roleMeta = ROLE_META[role] ?? { label: role, color: "text-gray-400" };
+
+  // Only show nav items the current role is allowed to visit
+  const navItems = ALL_NAV_ITEMS.filter(
+    ({ to }) => !NAV_ROLES[to] || NAV_ROLES[to].includes(role),
+  );
 
   const handleLogout = async () => {
     await logout();
@@ -79,7 +87,9 @@ export default function Sidebar() {
             <p className="text-white text-sm font-medium truncate">
               {user?.userName ?? "User"}
             </p>
-            <p className="text-gray-500 text-xs truncate">{user?.role ?? ""}</p>
+            <p className={`text-xs truncate font-medium ${roleMeta.color}`}>
+              {roleMeta.label}
+            </p>
           </div>
         </div>
         <button

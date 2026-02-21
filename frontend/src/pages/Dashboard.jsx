@@ -14,9 +14,15 @@ import AppLayout from "../components/layout/AppLayout";
 import StatCard from "../components/ui/StatCard";
 import { PageSpinner } from "../components/ui/Spinner";
 import { getDashboardSummary } from "../services/dashboard.service";
+import { useAuth } from "../context/AuthContext";
+import { DASHBOARD_SECTIONS, can } from "../config/roles";
 
 export default function Dashboard() {
   const [filters, setFilters] = useState({ startDate: "", endDate: "" });
+  const { user } = useAuth();
+  const role = user?.role ?? "";
+  // Helper: is this dashboard section visible for the current role?
+  const canSee = (section) => can(role, DASHBOARD_SECTIONS, section);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard", filters],
@@ -74,144 +80,152 @@ export default function Dashboard() {
 
       {data && (
         <div className="space-y-8">
-          {/* Fleet Overview */}
-          <section>
-            <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-widest mb-4">
-              Fleet Overview
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Total Vehicles"
-                value={v.total ?? 0}
-                subtitle={`${v.available ?? 0} available`}
-                icon={Truck}
-                color="indigo"
-              />
-              <StatCard
-                title="Available"
-                value={v.available ?? 0}
-                icon={CheckCircle}
-                color="emerald"
-              />
-              <StatCard
-                title="In Shop"
-                value={v.in_shop ?? 0}
-                icon={Wrench}
-                color="amber"
-              />
-              <StatCard
-                title="Retired"
-                value={v.retired ?? 0}
-                icon={AlertTriangle}
-                color="red"
-              />
-            </div>
-          </section>
+          {/* Fleet Overview — MANAGER, DISPATCHER */}
+          {canSee("fleet_overview") && (
+            <section>
+              <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-widest mb-4">
+                Fleet Overview
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard
+                  title="Total Vehicles"
+                  value={v.total ?? 0}
+                  subtitle={`${v.available ?? 0} available`}
+                  icon={Truck}
+                  color="indigo"
+                />
+                <StatCard
+                  title="Available"
+                  value={v.available ?? 0}
+                  icon={CheckCircle}
+                  color="emerald"
+                />
+                <StatCard
+                  title="In Shop"
+                  value={v.in_shop ?? 0}
+                  icon={Wrench}
+                  color="amber"
+                />
+                <StatCard
+                  title="Retired"
+                  value={v.retired ?? 0}
+                  icon={AlertTriangle}
+                  color="red"
+                />
+              </div>
+            </section>
+          )}
 
-          {/* Trip Activity */}
-          <section>
-            <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-widest mb-4">
-              Trip Activity
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Total Trips"
-                value={t.total ?? 0}
-                icon={Route}
-                color="indigo"
-              />
-              <StatCard
-                title="Active"
-                value={(t.dispatched ?? 0) + (t.in_transit ?? 0)}
-                subtitle={`${t.dispatched ?? 0} dispatched · ${t.in_transit ?? 0} in transit`}
-                icon={Activity}
-                color="blue"
-              />
-              <StatCard
-                title="Completed"
-                value={t.completed ?? 0}
-                icon={CheckCircle}
-                color="emerald"
-              />
-              <StatCard
-                title="Cancelled"
-                value={t.cancelled ?? 0}
-                icon={AlertTriangle}
-                color="red"
-              />
-            </div>
-          </section>
+          {/* Trip Activity — MANAGER, DISPATCHER, FINANCIAL_ANALYST */}
+          {canSee("trip_activity") && (
+            <section>
+              <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-widest mb-4">
+                Trip Activity
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard
+                  title="Total Trips"
+                  value={t.total ?? 0}
+                  icon={Route}
+                  color="indigo"
+                />
+                <StatCard
+                  title="Active"
+                  value={(t.dispatched ?? 0) + (t.in_transit ?? 0)}
+                  subtitle={`${t.dispatched ?? 0} dispatched · ${t.in_transit ?? 0} in transit`}
+                  icon={Activity}
+                  color="blue"
+                />
+                <StatCard
+                  title="Completed"
+                  value={t.completed ?? 0}
+                  icon={CheckCircle}
+                  color="emerald"
+                />
+                <StatCard
+                  title="Cancelled"
+                  value={t.cancelled ?? 0}
+                  icon={AlertTriangle}
+                  color="red"
+                />
+              </div>
+            </section>
+          )}
 
-          {/* Drivers */}
-          <section>
-            <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-widest mb-4">
-              Drivers
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Total Drivers"
-                value={d.total ?? 0}
-                icon={Users}
-                color="indigo"
-              />
-              <StatCard
-                title="On Duty"
-                value={d.on_duty ?? 0}
-                icon={Users}
-                color="emerald"
-              />
-              <StatCard
-                title="On Trip"
-                value={d.on_trip ?? 0}
-                icon={Route}
-                color="blue"
-              />
-              <StatCard
-                title="License Expiring"
-                value={d.expiring_licenses ?? 0}
-                subtitle="within 30 days"
-                icon={AlertTriangle}
-                color="amber"
-              />
-            </div>
-          </section>
+          {/* Drivers — MANAGER, DISPATCHER, SAFETY_OFFICER */}
+          {canSee("drivers") && (
+            <section>
+              <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-widest mb-4">
+                Drivers
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard
+                  title="Total Drivers"
+                  value={d.total ?? 0}
+                  icon={Users}
+                  color="indigo"
+                />
+                <StatCard
+                  title="On Duty"
+                  value={d.on_duty ?? 0}
+                  icon={Users}
+                  color="emerald"
+                />
+                <StatCard
+                  title="On Trip"
+                  value={d.on_trip ?? 0}
+                  icon={Route}
+                  color="blue"
+                />
+                <StatCard
+                  title="License Expiring"
+                  value={d.expiring_licenses ?? 0}
+                  subtitle="within 30 days"
+                  icon={AlertTriangle}
+                  color="amber"
+                />
+              </div>
+            </section>
+          )}
 
-          {/* Maintenance */}
-          <section>
-            <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-widest mb-4">
-              Maintenance
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Pending"
-                value={m.pending ?? 0}
-                icon={Wrench}
-                color="amber"
-              />
-              <StatCard
-                title="In Progress"
-                value={m.in_progress ?? 0}
-                icon={Activity}
-                color="blue"
-              />
-              <StatCard
-                title="Completed (30d)"
-                value={m.completed ?? 0}
-                icon={CheckCircle}
-                color="emerald"
-              />
-              <StatCard
-                title="Total Cost (30d)"
-                value={
-                  m.total_cost != null
-                    ? `₹${Number(m.total_cost).toLocaleString()}`
-                    : "—"
-                }
-                icon={TrendingUp}
-                color="indigo"
-              />
-            </div>
-          </section>
+          {/* Maintenance — MANAGER, SAFETY_OFFICER */}
+          {canSee("maintenance") && (
+            <section>
+              <h2 className="text-gray-500 text-xs font-semibold uppercase tracking-widest mb-4">
+                Maintenance
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard
+                  title="Pending"
+                  value={m.pending ?? 0}
+                  icon={Wrench}
+                  color="amber"
+                />
+                <StatCard
+                  title="In Progress"
+                  value={m.in_progress ?? 0}
+                  icon={Activity}
+                  color="blue"
+                />
+                <StatCard
+                  title="Completed (30d)"
+                  value={m.completed ?? 0}
+                  icon={CheckCircle}
+                  color="emerald"
+                />
+                <StatCard
+                  title="Total Cost (30d)"
+                  value={
+                    m.total_cost != null
+                      ? `₹${Number(m.total_cost).toLocaleString()}`
+                      : "—"
+                  }
+                  icon={TrendingUp}
+                  color="indigo"
+                />
+              </div>
+            </section>
+          )}
         </div>
       )}
     </AppLayout>
