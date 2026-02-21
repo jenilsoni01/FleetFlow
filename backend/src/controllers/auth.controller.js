@@ -9,7 +9,7 @@ const accessTokenOptions = {
   httpOnly: true,
   sameSite: process.env.NODE_ENV === "production" ? "Strict" : "Lax",
   secure: process.env.NODE_ENV === "production",
-  maxAge: 15 * 60 * 1000, // 15 minutes
+  maxAge: 24 * 60 * 60 * 1000, // 1 day
 };
 
 const refreshTokenOptions = {
