@@ -1,6 +1,6 @@
 ﻿import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, TrendingUp, Search, Car } from "lucide-react";
+import { DollarSign, TrendingUp, Search, Car, Download } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -20,6 +20,7 @@ import {
   getVehicleFuelEfficiency,
 } from "../services/expenses.service";
 import { getVehicles } from "../services/vehicles.service";
+import { exportExpensesList } from "../utils/exportCsv";
 
 const TABS = ["List", "Analytics"];
 const EXPENSE_TYPES = ["all", "fuel", "toll", "parking", "fine", "other"];
@@ -183,7 +184,7 @@ function AnalyticsTab() {
     <div>
       {/* All Expenses Chart */}
       <Section title="All Expenses">
-        {/* Type filter + legend */}
+        {/* Type filter + legend + export */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
           {["all", ...Object.keys(TYPE_COLORS)].map((t) => (
             <button
@@ -204,12 +205,23 @@ function AnalyticsTab() {
               {t}
             </button>
           ))}
-          {expenseChartData.length > 0 && (
-            <span className="ml-auto text-xs text-gray-600">
-              {expenseChartData.length} expense
-              {expenseChartData.length !== 1 ? "s" : ""}
-            </span>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {expenseChartData.length > 0 && (
+              <span className="text-xs text-gray-600">
+                {expenseChartData.length} expense
+                {expenseChartData.length !== 1 ? "s" : ""}
+              </span>
+            )}
+            {expenseChartData.length > 0 && (
+              <button
+                onClick={() => exportExpensesList(expenseChartData)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
+              >
+                <Download size={13} />
+                Export CSV
+              </button>
+            )}
+          </div>
         </div>
 
         {allExpenses.isLoading ? (
