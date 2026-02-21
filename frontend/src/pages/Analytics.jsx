@@ -7,6 +7,7 @@ import {
   Wrench,
   BarChart2,
   Calendar,
+  Download,
 } from "lucide-react";
 import {
   LineChart,
@@ -25,6 +26,11 @@ import AppLayout from "../components/layout/AppLayout";
 import EmptyState from "../components/ui/EmptyState";
 import { PageSpinner } from "../components/ui/Spinner";
 import { getMonthlyBurnRate } from "../services/expenses.service";
+import {
+  exportMonthlyTrend,
+  exportMonthlyComposition,
+  exportCategoryBreakdown,
+} from "../utils/exportCsv";
 
 const TYPE_COLORS = {
   fuel: "#f59e0b",
@@ -43,10 +49,19 @@ const MONTH_OPTIONS = [
   { label: "12 Months", value: 12 },
 ];
 
-function KpiCard({ icon: Icon, label, value, sub, iconColor = "text-indigo-400", bg = "bg-indigo-900/20" }) {
+function KpiCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  iconColor = "text-indigo-400",
+  bg = "bg-indigo-900/20",
+}) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex items-start gap-4">
-      <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
+      <div
+        className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center shrink-0`}
+      >
         <Icon size={20} className={iconColor} />
       </div>
       <div>
@@ -58,10 +73,13 @@ function KpiCard({ icon: Icon, label, value, sub, iconColor = "text-indigo-400",
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, action, children }) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
-      <h3 className="text-white font-semibold mb-4">{title}</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-white font-semibold">{title}</h3>
+        {action}
+      </div>
       {children}
     </div>
   );
@@ -77,7 +95,9 @@ function CustomTooltip({ active, payload, label }) {
           <span style={{ color: p.color ?? "#fff" }} className="capitalize">
             {p.name}
           </span>
-          <span className="text-white">₹{Number(p.value ?? 0).toLocaleString()}</span>
+          <span className="text-white">
+            ₹{Number(p.value ?? 0).toLocaleString()}
+          </span>
         </div>
       ))}
     </div>
@@ -112,7 +132,8 @@ export default function Analytics() {
   const typeAgg = useMemo(() => {
     const acc = {};
     burnData.forEach((m) => {
-      if (m.maintenance) acc.maintenance = (acc.maintenance ?? 0) + m.maintenance;
+      if (m.maintenance)
+        acc.maintenance = (acc.maintenance ?? 0) + m.maintenance;
       (m.breakdown ?? []).forEach((b) => {
         acc[b.type] = (acc[b.type] ?? 0) + b.amount;
       });
@@ -124,13 +145,15 @@ export default function Analytics() {
 
   // Summary KPIs
   const totalSpend = burnData.reduce((s, m) => s + (m.total ?? 0), 0);
-  const avgMonthly = burnData.length > 0 ? Math.round(totalSpend / burnData.length) : 0;
+  const avgMonthly =
+    burnData.length > 0 ? Math.round(totalSpend / burnData.length) : 0;
   const highestMonth = burnData.reduce(
     (best, m) => (m.total > (best?.total ?? 0) ? m : best),
     null,
   );
   const fuelTotal = typeAgg.find((t) => t.type === "fuel")?.total ?? 0;
-  const maintenanceTotal = typeAgg.find((t) => t.type === "maintenance")?.total ?? 0;
+  const maintenanceTotal =
+    typeAgg.find((t) => t.type === "maintenance")?.total ?? 0;
 
   const fmt = (v) => `₹${Math.round(v).toLocaleString()}`;
 
@@ -138,7 +161,9 @@ export default function Analytics() {
     <AppLayout title="Analytics">
       {/* Month range selector */}
       <div className="flex items-center justify-between mb-6">
-        <p className="text-gray-500 text-sm">Fleet-wide financial performance summary</p>
+        <p className="text-gray-500 text-sm">
+          Fleet-wide financial performance summary
+        </p>
         <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-lg p-1">
           {MONTH_OPTIONS.map((opt) => (
             <button
@@ -211,11 +236,28 @@ export default function Analytics() {
           </div>
 
           {/* Monthly Burn Rate Line Chart */}
-          <Section title="Monthly Spend Trend">
+          <Section
+            title="Monthly Spend Trend"
+            action={
+              <button
+                onClick={() => exportMonthlyTrend(burnData, months)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
+              >
+                <Download size={13} />
+                Export CSV
+              </button>
+            }
+          >
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={burnData} margin={{ top: 4, right: 20, left: 0, bottom: 0 }}>
+              <LineChart
+                data={burnData}
+                margin={{ top: 4, right: 20, left: 0, bottom: 0 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="month" tick={{ fill: "#9ca3af", fontSize: 11 }} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fill: "#9ca3af", fontSize: 11 }}
+                />
                 <YAxis
                   tick={{ fill: "#9ca3af", fontSize: 11 }}
                   tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
@@ -255,11 +297,28 @@ export default function Analytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Stacked expense type per month */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-4">Expense Composition by Month</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-semibold">
+                  Expense Composition by Month
+                </h3>
+                <button
+                  onClick={() => exportMonthlyComposition(stackedData, months)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
+                >
+                  <Download size={13} />
+                  Export CSV
+                </button>
+              </div>
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={stackedData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <BarChart
+                  data={stackedData}
+                  margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="month" tick={{ fill: "#9ca3af", fontSize: 10 }} />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: "#9ca3af", fontSize: 10 }}
+                  />
                   <YAxis
                     tick={{ fill: "#9ca3af", fontSize: 10 }}
                     tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
@@ -283,9 +342,20 @@ export default function Analytics() {
 
             {/* Overall Type Distribution */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-4">Total by Category</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-semibold">Total by Category</h3>
+                <button
+                  onClick={() => exportCategoryBreakdown(typeAgg, totalSpend)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
+                >
+                  <Download size={13} />
+                  Export CSV
+                </button>
+              </div>
               {typeAgg.length === 0 ? (
-                <p className="text-gray-600 text-sm">No category breakdown available.</p>
+                <p className="text-gray-600 text-sm">
+                  No category breakdown available.
+                </p>
               ) : (
                 <>
                   <ResponsiveContainer width="100%" height={200}>
@@ -294,7 +364,11 @@ export default function Analytics() {
                       layout="vertical"
                       margin={{ top: 0, right: 16, left: 60, bottom: 0 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#374151"
+                        horizontal={false}
+                      />
                       <XAxis
                         type="number"
                         tick={{ fill: "#9ca3af", fontSize: 10 }}
@@ -303,7 +377,11 @@ export default function Analytics() {
                       <YAxis
                         type="category"
                         dataKey="type"
-                        tick={{ fill: "#9ca3af", fontSize: 11, textTransform: "capitalize" }}
+                        tick={{
+                          fill: "#9ca3af",
+                          fontSize: 11,
+                          textTransform: "capitalize",
+                        }}
                       />
                       <Tooltip content={<CustomTooltip />} />
                       <Bar dataKey="total" radius={[0, 4, 4, 0]} name="total">
@@ -318,18 +396,29 @@ export default function Analytics() {
                   </ResponsiveContainer>
                   <div className="mt-4 space-y-2">
                     {typeAgg.map((t) => (
-                      <div key={t.type} className="flex items-center justify-between text-xs">
+                      <div
+                        key={t.type}
+                        className="flex items-center justify-between text-xs"
+                      >
                         <div className="flex items-center gap-2">
                           <span
                             className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: TYPE_COLORS[t.type] ?? "#6b7280" }}
+                            style={{
+                              backgroundColor: TYPE_COLORS[t.type] ?? "#6b7280",
+                            }}
                           />
-                          <span className="text-gray-400 capitalize">{t.type}</span>
+                          <span className="text-gray-400 capitalize">
+                            {t.type}
+                          </span>
                         </div>
                         <span className="text-white font-medium">
                           {fmt(t.total)}
                           <span className="text-gray-600 ml-1">
-                            ({totalSpend > 0 ? Math.round((t.total / totalSpend) * 100) : 0}%)
+                            (
+                            {totalSpend > 0
+                              ? Math.round((t.total / totalSpend) * 100)
+                              : 0}
+                            %)
                           </span>
                         </span>
                       </div>
@@ -347,11 +436,13 @@ export default function Analytics() {
               <div>
                 <p className="text-gray-400 text-sm">
                   Peak month:{" "}
-                  <span className="text-white font-semibold">{highestMonth.month}</span>
+                  <span className="text-white font-semibold">
+                    {highestMonth.month}
+                  </span>
                 </p>
                 <p className="text-gray-600 text-xs">
                   Total spend: {fmt(highestMonth.total)} — Trip expenses:{" "}
-                  {fmt(highestMonth.trip_expenses ?? 0)}  Maintenance:{" "}
+                  {fmt(highestMonth.trip_expenses ?? 0)} Maintenance:{" "}
                   {fmt(highestMonth.maintenance ?? 0)}
                 </p>
               </div>
