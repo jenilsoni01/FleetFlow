@@ -7,7 +7,7 @@
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+<!-- ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square) -->
 
 FleetFlow is a full-stack MERN application for managing fleets, dispatching trips, tracking drivers, logging maintenance, and generating operational analytics — all with strict role-based access control and real-time status synchronization across vehicles and drivers.
 
@@ -27,6 +27,12 @@ FleetFlow is a full-stack MERN application for managing fleets, dispatching trip
 - [Data Models](#-data-models)
 - [Role-Based Access Control](#-role-based-access-control)
 - [Business Logic & Validation](#-business-logic--validation)
+- [Flowcharts](#-flowcharts)
+  - [1. User Auth & RBAC Flow](#1-user-auth--rbac-flow)
+  - [2. Trip Dispatch Flow](#2-trip-dispatch-flow)
+  - [3. Vehicle Status Lifecycle](#3-vehicle-status-lifecycle)
+  - [4. Driver Status Lifecycle](#4-driver-status-lifecycle)
+  - [5. Maintenance Flow](#5-maintenance-flow)
 - [Pages & Routes](#-pages--routes)
 - [Contributing](#-contributing)
 
@@ -138,7 +144,6 @@ npm install
 
 # Create environment file
 cp .env.example .env
-# Fill in your values (see Environment Variables section)
 
 # Start development server
 npm run dev
@@ -277,15 +282,15 @@ All responses follow a consistent envelope:
 
 ```js
 {
-  license_plate:    String,    // Unique, regex: /^[A-Z0-9-]{6,10}$/
+  license_plate:    String,    
   name:             String,
-  vehicle_type_id:  ObjectId,  // ref → VehicleType
+  vehicle_type_id:  ObjectId,  
   max_load_kg:      Number,
   current_odometer: Number,
   acquisition_date: Date,
   acquisition_cost: Number,
-  status:           String,    // "available" | "on_trip" | "in_shop" | "out_of_service"
-  region_id:        ObjectId,  // ref → Region
+  status:           String,    
+  region_id:        ObjectId,  
   notes:            String,
   active:           Boolean
 }
@@ -296,14 +301,14 @@ All responses follow a consistent envelope:
 ```js
 {
   name:                  String,
-  employee_id:           String,   // Unique
-  license_number:        String,   // Unique
-  license_category:      String,   // "A" | "B" | "C" | "D"
+  employee_id:           String,   
+  license_number:        String,   
+  license_category:      String,   
   license_expiry:        Date,
-  status:                String,   // "on_duty" | "on_trip" | "off_duty" | "suspended"
-  safety_score:          Number,   // 0–100, default 100
+  status:                String,   
+  safety_score:          Number,   
   trip_completion_rate:  Number,
-  training_records:      Array,    // Embedded
+  training_records:      Array,    
   contact:               { phone, email },
   active:                Boolean
 }
@@ -313,17 +318,17 @@ All responses follow a consistent envelope:
 
 ```js
 {
-  trip_reference: String,   // Auto-generated: TRIP-YYYYMMDD-####
+  trip_reference: String,   
   origin:         String,
   destination:    String,
   cargo:          { description, weight_kg },
   schedule:       { scheduled_departure, estimated_arrival, actual_departure, actual_arrival },
-  priority:       String,   // "low" | "medium" | "high" | "urgent"
-  vehicle:        { _id, license_plate, name },  // Snapshot
-  driver:         { _id, name, employee_id },    // Snapshot
-  status:         String,   // "draft" | "dispatched" | "in_transit" | "completed" | "cancelled"
+  priority:       String,   
+  vehicle:        { _id, license_plate, name },  
+  driver:         { _id, name, employee_id },    
+  status:         String,   
   odometer:       { start, end },
-  expenses:       Array,    // Embedded — fuel, toll, parking, fine, other
+  expenses:       Array,    
   cancellation_reason: String,
   active:         Boolean
 }
@@ -334,12 +339,12 @@ All responses follow a consistent envelope:
 ```js
 {
   vehicle:             { _id, license_plate, name },
-  service_type:        String,  // "oil_change" | "tire_replacement" | "brake_service" | ...
+  service_type:        String,  
   dates:               { scheduled, start, completion },
   cost:                Number,
-  status:              String,  // "scheduled" | "in_progress" | "completed" | "cancelled"
+  status:              String,  
   next_service_due_km: Number,
-  parts:               Array,   // Embedded: { part_name, quantity, unit_cost, total_cost }
+  parts:               Array,   
   active:              Boolean
 }
 ```
@@ -349,10 +354,10 @@ All responses follow a consistent envelope:
 ```js
 {
   driver:        { _id, name, employee_id },
-  trip:          { _id, trip_reference },   // Optional
+  trip:          { _id, trip_reference },   
   incident_date: Date,
-  incident_type: String,  // "accident" | "violation" | "near_miss" | "complaint"
-  severity:      String,  // "minor" | "moderate" | "severe"
+  incident_type: String,  
+  severity:      String,  
   description:   String,
   actions_taken: String
 }
@@ -435,6 +440,49 @@ Configurable display: `km/L` or `L/100km`
 
 ---
 
+## 🗺 Flowcharts
+---
+
+### 1. User Auth & RBAC Flow
+
+> How a user logs in, gets validated, and is routed to the correct part of the app based on their role.
+
+![User Auth & RBAC Flow](docs/flowcharts/01-auth-rbac-flow.png)
+
+---
+
+### 2. Trip Dispatch Flow
+
+> End-to-end lifecycle of a trip from creation through completion or cancellation, including all validation gates.
+
+![Trip Dispatch Flow](docs/flowcharts/02-trip-dispatch-flow.png)
+
+---
+
+### 3. Vehicle Status Lifecycle
+
+> All possible states a vehicle can be in and what triggers each transition.
+
+![Vehicle Status Lifecycle](docs/flowcharts/03-vehicle-status-lifecycle.png)
+
+---
+
+### 4. Driver Status Lifecycle
+
+> All possible driver states, what triggers each transition, and compliance guards.
+
+![Driver Status Lifecycle](docs/flowcharts/04-driver-status-lifecycle.png)
+
+---
+
+### 5. Maintenance Flow
+
+> How a maintenance job is created, progresses, and how it automatically affects the linked vehicle's availability.
+
+![Maintenance Flow](docs/flowcharts/05-maintenance-flow.png)
+
+---
+
 ## 📄 Pages & Routes
 
 | Page | Route | Access |
@@ -448,16 +496,6 @@ Configurable display: `km/L` or `L/100km`
 | Driver Profiles | `/fleetflow/drivers` | Manager, Safety Officer |
 | Analytics | `/fleetflow/analytics` | All roles (scope varies) |
 | Settings | `/fleetflow/settings` | Fleet Manager only |
-
----
-
-## 🤝 Contributing
-
-1. Fork the repo
-2. Create your feature branch: `git checkout -b feature/your-feature`
-3. Commit your changes: `git commit -m "feat: add your feature"`
-4. Push to the branch: `git push origin feature/your-feature`
-5. Open a Pull Request
 
 ---
 
