@@ -18,7 +18,10 @@ app.use(express.json());
 app.use(cookieParser());
 
 import authRouter from "./routes/auth.routes.js";
+import dashboardRouter from "./routes/dashboard.routes.js";
+
 // auth routes
 app.use("/api/auth", authRouter);
+app.use("/api/dashboard", dashboardRouter);
 
 export default app;
