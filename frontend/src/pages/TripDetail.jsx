@@ -167,7 +167,6 @@ export default function TripDetail() {
         </div>
       </div>
 
-      {/* Cancellation banner */}
       {trip.status === "cancelled" && trip.cancellation_reason && (
         <div className="flex items-start gap-3 bg-red-900/20 border border-red-800 rounded-xl px-4 py-3 mb-6 text-sm">
           <XCircle size={16} className="text-red-400 mt-0.5 shrink-0" />
@@ -179,9 +178,9 @@ export default function TripDetail() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ── Left column (2/3) ── */}
+
         <div className="lg:col-span-2 space-y-5">
-          {/* Route & Assignment */}
+
           <Card title="Route & Assignment">
             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
               <InfoBlock
@@ -215,7 +214,7 @@ export default function TripDetail() {
             </div>
           </Card>
 
-          {/* Schedule */}
+
           <Card title="Schedule">
             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
               <InfoBlock
@@ -243,7 +242,7 @@ export default function TripDetail() {
             </div>
           </Card>
 
-          {/* Cargo */}
+
           <Card title="Cargo">
             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
               <InfoBlock
@@ -264,7 +263,7 @@ export default function TripDetail() {
             </div>
           </Card>
 
-          {/* Odometer */}
+
           <Card title="Odometer">
             <div className="grid grid-cols-3 gap-4">
               <StatBlock
@@ -308,7 +307,7 @@ export default function TripDetail() {
           )}
         </div>
 
-        {/* ── Right column (1/3) ── */}
+        
         <div className="space-y-5">
           {/* Summary stats */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
@@ -542,7 +541,6 @@ export default function TripDetail() {
   );
 }
 
-/* ── Sub-components ───────────────────────────────────────────────────────── */
 
 function Card({ title, children }) {
   return (

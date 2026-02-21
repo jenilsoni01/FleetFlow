@@ -5,7 +5,6 @@ import { FleetTrip } from "../models/fleetTrip.model.js";
 import { FleetVehicle } from "../models/fleetVehicle.model.js";
 import { FleetDriver } from "../models/fleetDriver.model.js";
 
-// CREATE TRIP
 export const createTrip = asyncHandler(async (req, res) => {
   const {
     vehicle_id,
@@ -20,7 +19,6 @@ export const createTrip = asyncHandler(async (req, res) => {
     notes,
   } = req.body;
 
-  // Validate vehicle exists and is available
   const vehicle = await FleetVehicle.findById(vehicle_id);
   if (!vehicle || !vehicle.active) {
     throw new ApiError(404, "Vehicle not found or inactive");
@@ -33,7 +31,6 @@ export const createTrip = asyncHandler(async (req, res) => {
     );
   }
 
-  // Check cargo weight against vehicle capacity
   if (cargo_weight_kg && cargo_weight_kg > vehicle.max_load_kg) {
     throw new ApiError(
       400,
@@ -41,7 +38,6 @@ export const createTrip = asyncHandler(async (req, res) => {
     );
   }
 
-  // Prepare trip data with vehicle snapshot
   const tripData = {
     origin,
     destination,
@@ -69,14 +65,12 @@ export const createTrip = asyncHandler(async (req, res) => {
     created_by: req.user?._id,
   };
 
-  // Optionally add driver snapshot if provided
   if (driver_id) {
     const driver = await FleetDriver.findById(driver_id);
     if (!driver || !driver.active) {
       throw new ApiError(404, "Driver not found or inactive");
     }
 
-    // Check driver availability
     if (driver.status === "on_trip") {
       throw new ApiError(400, "Driver is already on a trip");
     }
@@ -85,12 +79,10 @@ export const createTrip = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Driver is suspended");
     }
 
-    // Check license expiry
     if (driver.license_expiry && driver.license_expiry < new Date()) {
       throw new ApiError(400, "Driver's license has expired");
     }
 
-    // Check if driver has required license for vehicle type
     if (
       vehicle.vehicle_type.required_license_category &&
       driver.license_category !== vehicle.vehicle_type.required_license_category
@@ -108,13 +100,11 @@ export const createTrip = asyncHandler(async (req, res) => {
     };
   }
 
-  // Set odometer start from vehicle's current odometer
   tripData.odometer = {
     start: vehicle.current_odometer,
     end: 0,
   };
 
-  // Create trip
   const trip = await FleetTrip.create(tripData);
 
   return res
@@ -174,13 +164,11 @@ export const updateTrip = asyncHandler(async (req, res) => {
     notes,
   } = req.body;
 
-  // Update fields if provided
   if (origin !== undefined) trip.origin = origin;
   if (destination !== undefined) trip.destination = destination;
   if (cargo_description !== undefined)
     trip.cargo.description = cargo_description;
   if (cargo_weight_kg !== undefined) {
-    // Validate against vehicle capacity
     if (cargo_weight_kg > trip.vehicle.max_load_kg) {
       throw new ApiError(400, "Cargo weight exceeds vehicle capacity");
     }
@@ -216,19 +204,16 @@ export const dispatchTrip = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Cannot dispatch trip without a driver");
   }
 
-  // Update vehicle status
   const vehicle = await FleetVehicle.findById(trip.vehicle._id);
   if (!vehicle || vehicle.status !== "available") {
     throw new ApiError(400, "Vehicle is not available for dispatch");
   }
 
-  // Update driver status
   const driver = await FleetDriver.findById(trip.driver._id);
   if (!driver || !["on_duty", "off_duty"].includes(driver.status)) {
     throw new ApiError(400, "Driver is not available for dispatch");
   }
 
-  // Update statuses
   vehicle.status = "on_trip";
   vehicle.updated_by = req.user?._id;
   await vehicle.save();
@@ -285,7 +270,6 @@ export const completeTrip = asyncHandler(async (req, res) => {
     throw new ApiError(400, `Cannot complete trip with status: ${trip.status}`);
   }
 
-  // Validate odometer reading
   if (!odometer_end || odometer_end < trip.odometer.start) {
     throw new ApiError(
       400,
@@ -293,7 +277,6 @@ export const completeTrip = asyncHandler(async (req, res) => {
     );
   }
 
-  // Update vehicle
   const vehicle = await FleetVehicle.findById(trip.vehicle._id);
   if (vehicle) {
     vehicle.status = "available";
@@ -302,7 +285,6 @@ export const completeTrip = asyncHandler(async (req, res) => {
     await vehicle.save();
   }
 
-  // Update driver
   if (trip.driver._id) {
     const driver = await FleetDriver.findById(trip.driver._id);
     if (driver) {
@@ -312,7 +294,6 @@ export const completeTrip = asyncHandler(async (req, res) => {
     }
   }
 
-  // Update trip
   trip.status = "completed";
   trip.odometer.end = odometer_end;
   trip.schedule.actual_arrival = new Date();
@@ -324,7 +305,6 @@ export const completeTrip = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, trip, "Trip completed successfully"));
 });
 
-// CANCEL TRIP
 export const cancelTrip = asyncHandler(async (req, res) => {
   const { cancellation_reason } = req.body;
 
@@ -346,7 +326,6 @@ export const cancelTrip = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Cancellation reason is required");
   }
 
-  // If trip was dispatched or in transit, free up vehicle and driver
   if (["dispatched", "in_transit"].includes(trip.status)) {
     const vehicle = await FleetVehicle.findById(trip.vehicle._id);
     if (vehicle && vehicle.status === "on_trip") {
@@ -375,7 +354,6 @@ export const cancelTrip = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, trip, "Trip cancelled successfully"));
 });
 
-// ADD EXPENSE TO TRIP
 export const addExpense = asyncHandler(async (req, res) => {
   const trip = await FleetTrip.findOne({ _id: req.params.id, active: true });
 

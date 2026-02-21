@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 
-// ── Embedded: fuel_details (only present when expense_type = "fuel") ──────────
 const fuelDetailsSchema = new mongoose.Schema(
   {
     quantity: { type: Number, min: [0.01, "Fuel quantity must be > 0"] },
@@ -12,7 +11,6 @@ const fuelDetailsSchema = new mongoose.Schema(
   { _id: false },
 );
 
-// ── Embedded: single expense entry ───────────────────────────────────────────
 const expenseSchema = new mongoose.Schema(
   {
     expense_type: {
@@ -36,13 +34,12 @@ const expenseSchema = new mongoose.Schema(
   { _id: true },
 );
 
-// ── Main trip schema ──────────────────────────────────────────────────────────
 const fleetTripSchema = new mongoose.Schema(
   {
     trip_reference: {
       type: String,
       unique: true,
-      sparse: true, // auto-generated before save; sparse so draft doesn't conflict
+      sparse: true, 
       trim: true,
       uppercase: true,
     },
@@ -62,7 +59,7 @@ const fleetTripSchema = new mongoose.Schema(
       scheduled_departure: { type: Date, default: null },
       estimated_arrival: { type: Date, default: null },
       actual_departure: { type: Date, default: null },
-      actual_arrival: { type: Date, default: null }, // used in dashboard date filters
+      actual_arrival: { type: Date, default: null }, 
     },
 
     priority: {
@@ -71,7 +68,6 @@ const fleetTripSchema = new mongoose.Schema(
       default: "medium",
     },
 
-    // Snapshot pattern: keep _id for authoritative lookup + denormalized fields for fast reads
     vehicle: {
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -87,7 +83,6 @@ const fleetTripSchema = new mongoose.Schema(
       },
     },
 
-    // Snapshot pattern for driver
     driver: {
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -118,7 +113,6 @@ const fleetTripSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
-      // Bug fix: enforce this field at the schema level rather than relying on a comment
       validate: {
         validator: function (v) {
           if (this.status === "cancelled" && (!v || !v.trim())) {
@@ -132,7 +126,6 @@ const fleetTripSchema = new mongoose.Schema(
 
     expenses: { type: [expenseSchema], default: [] },
 
-    // region is carried from the vehicle snapshot for trip-level filtering
     region: {
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -160,30 +153,24 @@ const fleetTripSchema = new mongoose.Schema(
   },
 );
 
-// ── Indexes ───────────────────────────────────────────────────────────────────
-// Note: trip_reference index is declared via unique+sparse on the field itself above
 fleetTripSchema.index({ status: 1 });
 fleetTripSchema.index({ "vehicle._id": 1, status: 1 });
-fleetTripSchema.index({ "vehicle.vehicle_type_id": 1, status: 1 }); // supports vehicle_type filter on trip charts
+fleetTripSchema.index({ "vehicle.vehicle_type_id": 1, status: 1 }); 
 fleetTripSchema.index({ "driver._id": 1, status: 1 });
 fleetTripSchema.index({ "region._id": 1, status: 1 });
 fleetTripSchema.index({ "schedule.scheduled_departure": 1 });
-fleetTripSchema.index({ status: 1, "schedule.actual_arrival": -1 }); // dashboard: completed trips by date
+fleetTripSchema.index({ status: 1, "schedule.actual_arrival": -1 }); 
 fleetTripSchema.index({
   "expenses.expense_type": 1,
   "expenses.expense_date": -1,
-}); // fuel trend
+}); 
 fleetTripSchema.index({ active: 1 }, { sparse: true });
 
-// ── Auto-generate trip_reference before save ──────────────────────────────────
 fleetTripSchema.pre("save", async function () {
   if (!this.trip_reference) {
     const d = new Date();
     const datePart = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-    // Bug fix: countDocuments() is not atomic — two concurrent saves get the same
-    // count, collide on the unique index, and crash. Instead, derive uniqueness from
-    // this._id (already assigned by Mongoose before pre-save hooks run), which is
-    // guaranteed unique by MongoDB's ObjectId spec.
+
     const uniqueSuffix = this._id.toString().slice(-6).toUpperCase();
     this.trip_reference = `TRIP-${datePart}-${uniqueSuffix}`;
   }

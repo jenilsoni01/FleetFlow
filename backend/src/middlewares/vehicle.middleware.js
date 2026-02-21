@@ -10,7 +10,6 @@ export const validateVehicle = (req, res, next) => {
     acquisition_cost,
   } = req.body;
 
-  // Validate required fields
   if (!license_plate || !license_plate.trim()) {
     throw new ApiError(400, "License plate is required");
   }
@@ -43,7 +42,6 @@ export const validateVehicle = (req, res, next) => {
     throw new ApiError(400, "Acquisition cost must be greater than 0");
   }
 
-  // Validate license plate format (6-10 uppercase alphanumeric characters)
   const licensePlateRegex = /^[A-Z0-9-]{6,10}$/;
   if (!licensePlateRegex.test(license_plate.toUpperCase())) {
     throw new ApiError(
@@ -58,7 +56,6 @@ export const validateVehicle = (req, res, next) => {
 export const validateVehicleUpdate = (req, res, next) => {
   const { max_load_kg, current_odometer, acquisition_cost } = req.body;
 
-  // Validate numerical fields if provided
   if (max_load_kg !== undefined && max_load_kg <= 0) {
     throw new ApiError(400, "Max load capacity must be greater than 0");
   }

@@ -24,11 +24,11 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: [
-        "MANAGER",           // Oversee vehicle health, asset lifecycle [cite: 5]
-        "DISPATCHER",        // Create trips, assign drivers [cite: 6]
-        "SAFETY_OFFICER",    // Monitor compliance and safety [cite: 7]
-        "FINANCIAL_ANALYST", // Audit fuel spend and ROI [cite: 8]
-        "DRIVER"             // Assigned to vehicles for trips [cite: 49, 50]
+        "MANAGER",           
+        "DISPATCHER",   
+        "SAFETY_OFFICER",    
+        "FINANCIAL_ANALYST", 
+        "DRIVER"             
       ],
       required: [true, "User role is required"],
     },

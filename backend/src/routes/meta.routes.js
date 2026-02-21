@@ -1,9 +1,3 @@
-/**
- * GET /api/meta/vehicle-types  → all active VehicleType documents
- * GET /api/meta/regions        → all active Region documents
- *
- * Used by the frontend to populate dropdown lists in forms.
- */
 import express from "express";
 import { VehicleType } from "../models/vehicleType.model.js";
 import { Region } from "../models/region.model.js";

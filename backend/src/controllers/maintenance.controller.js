@@ -6,41 +6,21 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
-// ---------------------------------------------------------------------------
-// Helper: apply side-effects when a maintenance log status changes
-// ---------------------------------------------------------------------------
-/**
- * Handles all vehicle-status and trip-cancellation side-effects driven by
- * the maintenance log status machine:
- *
- *   → in_progress : vehicle.status = "in_shop"
- *                   dispatched trips for that vehicle are cancelled
- *   → completed   : vehicle.status = "available"  (only if still "in_shop")
- *                   vehicle.current_odometer updated if log odometer > current
- *   → cancelled   : vehicle.status restored to log.previous_vehicle_status
- *                   (only if vehicle is still "in_shop", i.e. we set it)
- */
 const applyStatusSideEffects = async ({
   log,
   vehicle,
   newStatus,
-  previousStatus = null, // null on first create
+  previousStatus = null,
   performedBy = null,
 }) => {
   if (!vehicle) return;
 
-  // Status hasn't changed – nothing to do
   if (previousStatus === newStatus) return;
 
   if (newStatus === "in_progress") {
-    // ── Put vehicle in shop ──────────────────────────────────────────────────
     vehicle.status = "in_shop";
     vehicle.updated_by = performedBy;
     await vehicle.save({ validateBeforeSave: false });
-
-    // ── Cancel all DISPATCHED trips for this vehicle ─────────────────────────
-    // "dispatched" trips are assigned but not yet moving; cancelling prevents
-    // the dispatcher from thinking a vehicle is on its way.
     await FleetTrip.updateMany(
       { "vehicle._id": vehicle._id, status: "dispatched" },
       {
@@ -52,13 +32,11 @@ const applyStatusSideEffects = async ({
       },
     );
   } else if (newStatus === "completed") {
-    // ── Release vehicle back to available ────────────────────────────────────
     if (vehicle.status === "in_shop") {
       vehicle.status = "available";
       vehicle.updated_by = performedBy;
     }
 
-    // ── Advance odometer if the service reading is higher ───────────────────
     if (
       log.odometer_at_service &&
       log.odometer_at_service > vehicle.current_odometer
@@ -68,8 +46,6 @@ const applyStatusSideEffects = async ({
 
     await vehicle.save({ validateBeforeSave: false });
   } else if (newStatus === "cancelled") {
-    // ── Restore vehicle to the status it had before we moved it to in_shop ──
-    // Only act if we were the ones who set it to in_shop (defensive check).
     if (vehicle.status === "in_shop") {
       vehicle.status = log.previous_vehicle_status || "available";
       vehicle.updated_by = performedBy;
@@ -78,9 +54,7 @@ const applyStatusSideEffects = async ({
   }
 };
 
-// ---------------------------------------------------------------------------
 // POST /api/maintenance  — Create a new maintenance log
-// ---------------------------------------------------------------------------
 export const createMaintenanceLog = asyncHandler(async (req, res) => {
   const {
     vehicle_id,
@@ -95,12 +69,10 @@ export const createMaintenanceLog = asyncHandler(async (req, res) => {
     parts,
   } = req.body;
 
-  // ── Validate vehicle_id ────────────────────────────────────────────────────
   if (!vehicle_id || !mongoose.isValidObjectId(vehicle_id)) {
     throw new ApiError(400, "A valid vehicle_id is required");
   }
 
-  // ── Fetch and guard vehicle ────────────────────────────────────────────────
   const vehicle = await FleetVehicle.findById(vehicle_id);
   if (!vehicle) throw new ApiError(404, "Vehicle not found");
   if (!vehicle.active)
@@ -114,7 +86,6 @@ export const createMaintenanceLog = asyncHandler(async (req, res) => {
       "Cannot schedule maintenance for a vehicle that is out of service",
     );
 
-  // ── Build document ──────────────────────────────────────────────────────────
   const log = new MaintenanceLog({
     vehicle: {
       _id: vehicle._id,
@@ -131,7 +102,6 @@ export const createMaintenanceLog = asyncHandler(async (req, res) => {
     odometer_at_service: odometer_at_service ?? vehicle.current_odometer,
     cost: cost ?? 0,
     service_provider: service_provider || "",
-    // Save original vehicle status so cancel can restore it
     previous_vehicle_status: vehicle.status,
     status,
     next_service_due_km: next_service_due_km ?? 0,
@@ -140,16 +110,14 @@ export const createMaintenanceLog = asyncHandler(async (req, res) => {
     updated_by: req.user?._id ?? null,
   });
 
-  // Validate before applying side-effects (catches schema-level validators)
   await log.validate();
   await log.save();
 
-  // ── Status side-effects ────────────────────────────────────────────────────
   await applyStatusSideEffects({
     log,
     vehicle,
     newStatus: status,
-    previousStatus: null, // first save – treat every status as a "change"
+    previousStatus: null, 
     performedBy: req.user?._id ?? null,
   });
 
@@ -158,9 +126,7 @@ export const createMaintenanceLog = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, log, "Maintenance log created successfully"));
 });
 
-// ---------------------------------------------------------------------------
 // GET /api/maintenance  — List logs (with optional filters)
-// ---------------------------------------------------------------------------
 export const getMaintenanceLogs = asyncHandler(async (req, res) => {
   const {
     vehicle_id,
@@ -186,11 +152,9 @@ export const getMaintenanceLogs = asyncHandler(async (req, res) => {
     if (statuses.length === 1) match.status = statuses[0];
     else if (statuses.length > 1) match.status = { $in: statuses };
   } else {
-    // Default: show open jobs only (matches table-view default in spec)
     match.status = { $in: ["scheduled", "in_progress"] };
   }
 
-  // "Upcoming services" quick action: next 7 days scheduled jobs
   if (upcoming === "true") {
     const in7Days = new Date();
     in7Days.setDate(in7Days.getDate() + 7);
@@ -198,7 +162,6 @@ export const getMaintenanceLogs = asyncHandler(async (req, res) => {
     match["dates.scheduled"] = { $lte: in7Days, $gte: new Date() };
   }
 
-  // "Overdue maintenance" quick action: scheduled_date < today and still scheduled
   if (overdue === "true") {
     match.status = "scheduled";
     match["dates.scheduled"] = { $lt: new Date() };
@@ -225,9 +188,7 @@ export const getMaintenanceLogs = asyncHandler(async (req, res) => {
     );
 });
 
-// ---------------------------------------------------------------------------
 // GET /api/maintenance/:id  — Get single log
-// ---------------------------------------------------------------------------
 export const getMaintenanceLogById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid log id");
@@ -245,9 +206,7 @@ export const getMaintenanceLogById = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, log, "Maintenance log fetched successfully"));
 });
 
-// ---------------------------------------------------------------------------
 // PATCH /api/maintenance/:id  — Update a log (handles status transitions)
-// ---------------------------------------------------------------------------
 export const updateMaintenanceLog = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid log id");
@@ -275,7 +234,6 @@ export const updateMaintenanceLog = asyncHandler(async (req, res) => {
 
   const newStatus = status ?? previousStatus;
 
-  // ── Apply scalar updates ───────────────────────────────────────────────────
   if (service_type !== undefined) log.service_type = service_type;
   if (description !== undefined) log.description = description;
   if (scheduled_date !== undefined)
@@ -288,7 +246,6 @@ export const updateMaintenanceLog = asyncHandler(async (req, res) => {
     log.next_service_due_km = next_service_due_km;
   if (parts !== undefined) log.parts = parts;
 
-  // ── Auto-set dates on status transitions ──────────────────────────────────
   if (newStatus !== previousStatus) {
     if (newStatus === "in_progress" && !log.dates.start) {
       log.dates.start = new Date();
@@ -301,14 +258,10 @@ export const updateMaintenanceLog = asyncHandler(async (req, res) => {
   log.status = newStatus;
   log.updated_by = req.user?._id ?? null;
 
-  // Save first — if schema validation fails (e.g. cost > 0 required when completed),
-  // we never touch the vehicle, keeping DB state consistent.
   await log.save();
 
-  // Fetch vehicle for side-effects (use snapshot _id)
   const vehicle = await FleetVehicle.findById(log.vehicle._id);
 
-  // ── Status side-effects ────────────────────────────────────────────────────
   await applyStatusSideEffects({
     log,
     vehicle,
@@ -322,9 +275,7 @@ export const updateMaintenanceLog = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, log, "Maintenance log updated successfully"));
 });
 
-// ---------------------------------------------------------------------------
 // DELETE /api/maintenance/:id  — Soft-delete (active = false)
-// ---------------------------------------------------------------------------
 export const deleteMaintenanceLog = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid log id");
@@ -336,7 +287,6 @@ export const deleteMaintenanceLog = asyncHandler(async (req, res) => {
   });
   if (!log) throw new ApiError(404, "Maintenance log not found");
 
-  // Prevent deletion of in-progress jobs — complete or cancel them first
   if (log.status === "in_progress") {
     throw new ApiError(
       400,

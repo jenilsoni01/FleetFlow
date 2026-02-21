@@ -13,7 +13,6 @@ const vehicleTypeSchema = new mongoose.Schema(
       required: [true, "Default max load is required"],
       min: [0.1, "Default max load must be greater than 0"],
     },
-    // Maps to the driver license category required to operate this vehicle type
     required_license_category: {
       type: String,
       enum: {

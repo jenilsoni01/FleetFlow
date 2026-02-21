@@ -16,14 +16,12 @@ const Login = () => {
     const location = useLocation();
     const { login, isAuthenticated } = useAuth();
 
-    // Auto-fill email from signup redirect
     useEffect(() => {
         if (location.state?.email) {
             setFormData(prev => ({ ...prev, email: location.state.email }));
         }
     }, [location]);
 
-    // Only redirect if already authenticated AND not coming from signup
     useEffect(() => {
         if (isAuthenticated && !location.state?.email) {
             navigate('/dashboard', { replace: true });

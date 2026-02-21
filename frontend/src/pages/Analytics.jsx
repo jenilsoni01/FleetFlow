@@ -115,7 +115,6 @@ export default function Analytics() {
 
   const burnData = burnRate.data?.burnRate ?? [];
 
-  // Pivot breakdown types into each month row for the stacked bar
   const stackedData = useMemo(
     () =>
       burnData.map((m) => {
@@ -128,7 +127,6 @@ export default function Analytics() {
     [burnData],
   );
 
-  // Aggregate totals by type across all months
   const typeAgg = useMemo(() => {
     const acc = {};
     burnData.forEach((m) => {
@@ -143,7 +141,6 @@ export default function Analytics() {
       .sort((a, b) => b.total - a.total);
   }, [burnData]);
 
-  // Summary KPIs
   const totalSpend = burnData.reduce((s, m) => s + (m.total ?? 0), 0);
   const avgMonthly =
     burnData.length > 0 ? Math.round(totalSpend / burnData.length) : 0;

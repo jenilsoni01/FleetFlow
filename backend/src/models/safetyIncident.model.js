@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 const safetyIncidentSchema = new mongoose.Schema(
   {
-    // Snapshot pattern: driver details for fast reads
     driver: {
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -13,7 +12,6 @@ const safetyIncidentSchema = new mongoose.Schema(
       employee_id: { type: String, default: "" },
     },
 
-    // Optional — incident may occur outside of a tracked trip
     trip: {
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -76,13 +74,11 @@ const safetyIncidentSchema = new mongoose.Schema(
   },
 );
 
-// ── Indexes ───────────────────────────────────────────────────────────────────
 safetyIncidentSchema.index({ "driver._id": 1 });
 safetyIncidentSchema.index({ incident_date: -1 });
 safetyIncidentSchema.index({ incident_type: 1 });
 safetyIncidentSchema.index({ severity: 1 });
 safetyIncidentSchema.index({ active: 1 }, { sparse: true });
-// Compound: driver safety history sorted by date (used in driver performance tab)
 safetyIncidentSchema.index({ "driver._id": 1, incident_date: -1 });
 
 export const SafetyIncident = mongoose.model(

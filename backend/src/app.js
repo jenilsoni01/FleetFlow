@@ -51,7 +51,6 @@ app.use((err, req, res, next) => {
     err instanceof ApiError ? err.message : "Internal Server Error";
   const errors = err instanceof ApiError ? err.errors : [];
 
-  // Log non-ApiErrors so we can see the raw Mongoose / JWT error
   if (!(err instanceof ApiError)) {
     console.error("[UNHANDLED ERROR]", err);
   }

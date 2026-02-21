@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 
-// ── Embedded: single training record ─────────────────────────────────────────
 const trainingRecordSchema = new mongoose.Schema(
   {
     training_type: {
@@ -24,7 +23,6 @@ const trainingRecordSchema = new mongoose.Schema(
   { _id: true },
 );
 
-// ── Main driver schema ────────────────────────────────────────────────────────
 const fleetDriverSchema = new mongoose.Schema(
   {
     name: {
@@ -72,7 +70,6 @@ const fleetDriverSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Snapshot pattern: embed region for fast reads (same as FleetVehicle)
     region: {
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -84,7 +81,7 @@ const fleetDriverSchema = new mongoose.Schema(
     },
 
     profile_photo: {
-      type: mongoose.Schema.Types.ObjectId, // GridFS ref for files > 1MB
+      type: mongoose.Schema.Types.ObjectId, 
       default: null,
     },
 
@@ -100,7 +97,6 @@ const fleetDriverSchema = new mongoose.Schema(
       trip_completion_rate: { type: Number, min: 0, max: 100, default: 0 },
     },
 
-    // Embedded: training records are always accessed with the driver profile
     training_records: { type: [trainingRecordSchema], default: [] },
 
     active: { type: Boolean, default: true },
@@ -120,15 +116,12 @@ const fleetDriverSchema = new mongoose.Schema(
   },
 );
 
-// ── Indexes ───────────────────────────────────────────────────────────────────
 fleetDriverSchema.index({ status: 1 });
-fleetDriverSchema.index({ license_expiry: 1 }); // cron: expiry reminders
+fleetDriverSchema.index({ license_expiry: 1 }); 
 fleetDriverSchema.index({ "region._id": 1 });
-fleetDriverSchema.index({ "training_records.expiry_date": 1 }); // expiring certs
+fleetDriverSchema.index({ "training_records.expiry_date": 1 }); 
 fleetDriverSchema.index({ active: 1 }, { sparse: true });
-fleetDriverSchema.index({ "metrics.safety_score": -1 }); // top performers
-
-// ── Validate: license expiry must be in the future when creating ──────────────
+fleetDriverSchema.index({ "metrics.safety_score": -1 }); 
 fleetDriverSchema.pre("save", function () {
   if (this.isNew && this.license_expiry && this.license_expiry <= new Date()) {
     throw new Error(

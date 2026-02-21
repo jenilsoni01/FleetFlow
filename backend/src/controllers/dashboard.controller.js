@@ -12,20 +12,6 @@ const VALID_VEHICLE_STATUSES = [
   "out_of_service",
 ];
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Build the base $match object for FleetVehicle from query params.
- * Optionally restrict to active vehicles only.
- *
- * Supported query params:
- *   region_id        – ObjectId string
- *   vehicle_type_id  – ObjectId string
- *   status           – single value OR comma-separated list
- *                      e.g. "available" or "available,on_trip"
- */
 const buildVehicleMatch = (query, { requireActive = false } = {}) => {
   const match = {};
 
@@ -44,7 +30,6 @@ const buildVehicleMatch = (query, { requireActive = false } = {}) => {
     );
   }
 
-  // Status filter – supports single or comma-separated values
   if (query.status) {
     const requested = query.status
       .split(",")
@@ -56,25 +41,18 @@ const buildVehicleMatch = (query, { requireActive = false } = {}) => {
     } else if (requested.length > 1) {
       match.status = { $in: requested };
     }
-    // If none of the provided values are valid, no status filter is applied
   }
 
   return match;
 };
 
-/**
- * Build the base $match object for FleetTrip from query params.
- * startDate / endDate are matched against schedule.actual_arrival (nested).
- */
 const buildTripMatch = (query) => {
   const match = {};
 
-  // Snapshot pattern: region is a nested object in trips
   if (query.region_id && mongoose.isValidObjectId(query.region_id)) {
     match["region._id"] = new mongoose.Types.ObjectId(query.region_id);
   }
 
-  // Filter trip charts by vehicle type via the vehicle snapshot field
   if (
     query.vehicle_type_id &&
     mongoose.isValidObjectId(query.vehicle_type_id)
@@ -99,11 +77,6 @@ const buildTripMatch = (query) => {
   return match;
 };
 
-/**
- * Merges a base $match with a chart-specific date condition on `dateField`.
- * If the base match already contains `dateField` (from a user date filter),
- * uses $and to combine both conditions instead of overwriting one with the other.
- */
 const mergeMatchWithDateRange = (baseMatch, dateField, dateCondition) => {
   if (baseMatch[dateField]) {
     const { [dateField]: existingCondition, ...rest } = baseMatch;
@@ -118,12 +91,8 @@ const mergeMatchWithDateRange = (baseMatch, dateField, dateCondition) => {
   return { ...baseMatch, [dateField]: dateCondition };
 };
 
-// ---------------------------------------------------------------------------
 // Controller
-// ---------------------------------------------------------------------------
-
 export const getDashboardSummary = asyncHandler(async (req, res) => {
-  // Validate status query param early so we can return a clear error
   if (req.query.status) {
     const requested = req.query.status
       .split(",")
@@ -139,8 +108,6 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     }
   }
 
-  // Bug fix: validate date strings before passing to new Date() to avoid
-  // Invalid Date objects silently reaching MongoDB aggregation pipelines
   if (req.query.startDate && isNaN(new Date(req.query.startDate).getTime())) {
     throw new ApiError(
       400,
@@ -154,9 +121,6 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     );
   }
 
-  // vehicleBaseMatch includes the status filter (used for fleetStatusBreakdown chart)
-  // vehicleKpiMatch intentionally omits the status filter so KPI hardcoded statuses
-  // (on_trip, in_shop) are not shadowed by user-supplied status filter
   const vehicleBaseMatch = buildVehicleMatch(req.query, {
     requireActive: true,
   });
@@ -165,16 +129,13 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     { requireActive: true },
   );
   const tripBaseMatch = buildTripMatch(req.query);
-  // pendingCargo counts drafts which have no actual_arrival – date filter must not apply
   const tripNoDateMatch = buildTripMatch({
     ...req.query,
     startDate: undefined,
     endDate: undefined,
   });
 
-  // ------------------------------------------------------------------
-  // Pre-compute commonly reused date boundaries
-  // ------------------------------------------------------------------
+  // Pre-compute commonly reused date boundaries-
   const now = new Date();
 
   const sevenDaysAgo = new Date(now);
@@ -188,9 +149,7 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
 
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // ------------------------------------------------------------------
   // Run all DB operations concurrently
-  // ------------------------------------------------------------------
   const [
     activeFleet,
     maintenanceAlerts,
@@ -201,17 +160,16 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     fuelSpendTrend,
     topVehiclesByDistance,
   ] = await Promise.all([
-    // ── KPI 1 ── Active fleet (on trip) – uses kpiMatch so status filter doesn't zero this out
+    // ── KPI 1 ── Active fleet (on trip) 
     FleetVehicle.countDocuments({ ...vehicleKpiMatch, status: "on_trip" }),
 
-    // ── KPI 2 ── Vehicles in maintenance – same reasoning
+    // ── KPI 2 ── Vehicles in maintenance
     FleetVehicle.countDocuments({ ...vehicleKpiMatch, status: "in_shop" }),
 
-    // ── KPI 3 ── Drafts / pending cargo (date filter excluded – drafts have no actual_arrival)
+    // ── KPI 3 ── Drafts / pending cargo 
     FleetTrip.countDocuments({ ...tripNoDateMatch, status: "draft" }),
 
     // ── KPI 4 (denominator) ── All active, non-decommissioned vehicles
-    // Always uses kpiMatch so utilization rate reflects the real fleet, not just the filtered subset
     FleetVehicle.countDocuments({
       ...vehicleKpiMatch,
       status: { $ne: "out_of_service" },
@@ -237,8 +195,6 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     ]),
 
     // ── Chart 2 ── Weekly trip volume (completed trips last 7 days, grouped by day)
-    // mergeMatchWithDateRange prevents the hardcoded $gte from silently overwriting
-    // any user-supplied startDate/endDate already present in tripBaseMatch
     FleetTrip.aggregate([
       {
         $match: mergeMatchWithDateRange(
@@ -270,7 +226,6 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
 
     // ── Chart 3 ── Fuel spend trend (last 6 months, grouped by month)
     FleetTrip.aggregate([
-      // Stage 1: Only trips that have at least one fuel expense in range
       {
         $match: {
           ...tripBaseMatch,
@@ -278,16 +233,13 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
           "expenses.expense_date": { $gte: sixMonthsAgo },
         },
       },
-      // Stage 2: Expand each expense into its own document
       { $unwind: "$expenses" },
-      // Stage 3: Keep only fuel expenses within the 6-month window
       {
         $match: {
           "expenses.expense_type": "fuel",
           "expenses.expense_date": { $gte: sixMonthsAgo },
         },
       },
-      // Stage 4: Group by year-month and sum amount
       {
         $group: {
           _id: {
@@ -310,8 +262,6 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     ]),
 
     // ── Chart 4 ── Top 5 vehicles by distance (current month, completed trips)
-    // mergeMatchWithDateRange prevents the startOfMonth $gte from overwriting
-    // any user-supplied date filter already present in tripBaseMatch
     FleetTrip.aggregate([
       {
         $match: mergeMatchWithDateRange(
@@ -320,7 +270,6 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
           { $gte: startOfMonth },
         ),
       },
-      // Stage 2: Group by vehicle snapshot _id, sum odometer delta
       {
         $group: {
           _id: "$vehicle._id",
@@ -332,7 +281,6 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
       },
       { $sort: { totalDistance: -1 } },
       { $limit: 5 },
-      // Stage 5: Populate vehicle details from fleet_vehicles collection
       {
         $lookup: {
           from: "fleetvehicles",
@@ -356,30 +304,26 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     ]),
   ]);
 
-  // ------------------------------------------------------------------
   // Compute derived KPI
-  // ------------------------------------------------------------------
   const utilizationRate =
     totalActiveVehicles > 0
-      ? Math.round((activeFleet / totalActiveVehicles) * 100 * 10) / 10 // 1 decimal place
+      ? Math.round((activeFleet / totalActiveVehicles) * 100 * 10) / 10 
       : 0;
 
-  // ------------------------------------------------------------------
   // Shape the response
-  // ------------------------------------------------------------------
   const payload = {
     kpis: {
       activeFleet,
       maintenanceAlerts,
       pendingCargo,
-      utilizationRate, // e.g. 62.5 (%)
+      utilizationRate, 
       totalActiveVehicles,
     },
     charts: {
-      fleetStatusBreakdown, // [{ status, count }]
-      weeklyTripVolume, // [{ date, trips }]
-      fuelSpendTrend, // [{ month, totalFuelSpend }]
-      topVehiclesByDistance, // [{ vehicle_id, license_plate, name, totalDistance, tripsCompleted }]
+      fleetStatusBreakdown, 
+      weeklyTripVolume, 
+      fuelSpendTrend, 
+      topVehiclesByDistance, 
     },
     meta: {
       generatedAt: new Date().toISOString(),

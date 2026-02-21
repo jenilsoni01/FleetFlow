@@ -30,7 +30,7 @@ export default function Sidebar() {
   const role = user?.role ?? "";
   const roleMeta = ROLE_META[role] ?? { label: role, color: "text-gray-400" };
 
-  // Only show nav items the current role is allowed to visit
+  
   const navItems = ALL_NAV_ITEMS.filter(
     ({ to }) => !NAV_ROLES[to] || NAV_ROLES[to].includes(role),
   );

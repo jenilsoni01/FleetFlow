@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 
-// ── Embedded: single replacement part ────────────────────────────────────────
 const partSchema = new mongoose.Schema(
   {
     part_name: {
@@ -18,16 +17,14 @@ const partSchema = new mongoose.Schema(
       required: [true, "Unit cost is required"],
       min: [0, "Unit cost cannot be negative"],
     },
-    total_cost: { type: Number }, // derived: quantity * unit_cost (set in pre-save)
+    total_cost: { type: Number }, 
     created_at: { type: Date, default: Date.now },
   },
   { _id: true },
 );
 
-// ── Main maintenance log schema ───────────────────────────────────────────────
 const maintenanceLogSchema = new mongoose.Schema(
   {
-    // Snapshot pattern: vehicle details for fast reads without lookup
     vehicle: {
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -59,7 +56,6 @@ const maintenanceLogSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
-      // Required when service_type = "other"
       validate: {
         validator: function (v) {
           if (this.service_type === "other" && (!v || !v.trim())) return false;
@@ -72,7 +68,7 @@ const maintenanceLogSchema = new mongoose.Schema(
     dates: {
       scheduled: { type: Date, required: [true, "Scheduled date is required"] },
       start: { type: Date, default: null },
-      completion: { type: Date, default: null }, // must be >= start if set
+      completion: { type: Date, default: null }, 
     },
 
     odometer_at_service: { type: Number, min: 0, default: 0 },
@@ -81,7 +77,6 @@ const maintenanceLogSchema = new mongoose.Schema(
       type: Number,
       min: [0, "Cost cannot be negative"],
       default: 0,
-      // Required when status = "completed"
       validate: {
         validator: function (v) {
           if (this.status === "completed" && (!v || v <= 0)) return false;
@@ -93,7 +88,6 @@ const maintenanceLogSchema = new mongoose.Schema(
 
     service_provider: { type: String, trim: true, default: "" },
 
-    // Stored when we flip vehicle.status → "in_shop" so we can restore on cancel
     previous_vehicle_status: {
       type: String,
       enum: ["available", "on_trip", "in_shop", "out_of_service"],
@@ -113,7 +107,6 @@ const maintenanceLogSchema = new mongoose.Schema(
 
     next_service_due_km: { type: Number, min: 0, default: 0 },
 
-    // Embedded: parts are always fetched with the log
     parts: { type: [partSchema], default: [] },
 
     active: { type: Boolean, default: true },
@@ -133,21 +126,18 @@ const maintenanceLogSchema = new mongoose.Schema(
   },
 );
 
-// ── Indexes ───────────────────────────────────────────────────────────────────
 maintenanceLogSchema.index({ "vehicle._id": 1 });
 maintenanceLogSchema.index({ status: 1 });
 maintenanceLogSchema.index({ "dates.scheduled": 1 });
 maintenanceLogSchema.index({ active: 1 }, { sparse: true });
-maintenanceLogSchema.index({ "vehicle._id": 1, status: 1 }); // per-vehicle open jobs
+maintenanceLogSchema.index({ "vehicle._id": 1, status: 1 }); s
 
-// ── Auto-compute total_cost per part before save ──────────────────────────────
 maintenanceLogSchema.pre("save", function () {
   if (this.isModified("parts")) {
     this.parts.forEach((part) => {
       part.total_cost = part.quantity * part.unit_cost;
     });
   }
-  // Validate: completion date >= start date
   if (
     this.dates.completion &&
     this.dates.start &&

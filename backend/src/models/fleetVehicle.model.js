@@ -18,7 +18,6 @@ const fleetVehicleSchema = new mongoose.Schema(
       required: [true, "Vehicle name is required"],
       trim: true,
     },
-    // Snapshot pattern: embed type fields to avoid joins on read-heavy queries
     vehicle_type: {
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -58,7 +57,6 @@ const fleetVehicleSchema = new mongoose.Schema(
       default: "available",
       required: true,
     },
-    // Snapshot pattern: embed region name/code for fast reads
     region: {
       _id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -93,12 +91,10 @@ const fleetVehicleSchema = new mongoose.Schema(
   },
 );
 
-// ── Indexes ──────────────────────────────────────────────────────────────────
 fleetVehicleSchema.index({ status: 1 });
 fleetVehicleSchema.index({ "vehicle_type._id": 1 });
 fleetVehicleSchema.index({ "region._id": 1 });
 fleetVehicleSchema.index({ active: 1 }, { sparse: true });
-// Compound indexes for dashboard KPI + filter queries
 fleetVehicleSchema.index({ status: 1, active: 1 });
 fleetVehicleSchema.index({ "region._id": 1, status: 1, active: 1 });
 fleetVehicleSchema.index({ "vehicle_type._id": 1, status: 1, active: 1 });

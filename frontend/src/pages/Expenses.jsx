@@ -153,7 +153,6 @@ function AnalyticsTab() {
     expenseChartData.length * BAR_MIN_WIDTH,
   );
 
-  // Backend: { vehicle, costs: { fuel, maintenance, other_expenses, total_operational }, metrics: {...} }
   const costs = opCost.data?.costs;
   const metrics = opCost.data?.metrics;
   const vehicleInfo = opCost.data?.vehicle;
@@ -182,9 +181,9 @@ function AnalyticsTab() {
 
   return (
     <div>
-      {/* All Expenses Chart */}
+
       <Section title="All Expenses">
-        {/* Type filter + legend + export */}
+
         <div className="flex flex-wrap items-center gap-2 mb-4">
           {["all", ...Object.keys(TYPE_COLORS)].map((t) => (
             <button
@@ -235,7 +234,6 @@ function AnalyticsTab() {
             description="Expenses from trips will appear here."
           />
         ) : (
-          /* Horizontally scrollable so bars never get squished */
           <div className="overflow-x-auto pb-1">
             <div style={{ width: chartPixelWidth, minWidth: "100%" }}>
               <BarChart
@@ -463,8 +461,6 @@ function ListTab() {
     staleTime: 30_000,
   });
 
-  // Backend returns { expenses: [...], total, page, limit }
-  // Each expense after $replaceRoot has trip_reference, vehicle, trip_status at top level
   const expenses = (data?.expenses ?? data ?? []).filter((e) =>
     search
       ? e.description?.toLowerCase().includes(search.toLowerCase()) ||

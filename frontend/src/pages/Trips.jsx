@@ -64,7 +64,7 @@ export default function Trips() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-  const [actionModal, setActionModal] = useState(null); // { type, trip }
+  const [actionModal, setActionModal] = useState(null); 
   const [cancelReason, setCancelReason] = useState("");
   const [odometerEnd, setOdometerEnd] = useState("");
   const toast = useToast();

@@ -1,11 +1,4 @@
-/**
- * Frontend validation rules mirroring backend middleware + Mongoose schema.
- *
- * Each validator returns: null (ok) | string (error message)
- * validate(rules, form) → errors object  { field: "message" } (empty = valid)
- */
 
-// ── Primitives ──────────────────────────────────────────────────────────────
 
 export const required = (label) => (v) =>
   !v || !String(v).trim() ? `${label} is required` : null;
@@ -37,9 +30,7 @@ export const pastOrTodayDate = (label) => (v) => {
   return d > today ? `${label} cannot be in the future` : null;
 };
 
-// ── Domain-specific ──────────────────────────────────────────────────────────
 
-/** /^[A-Z0-9-]{6,10}$/ — matches backend model + middleware */
 export const licensePlate = (v) => {
   if (!v || !v.trim()) return "License plate is required";
   return /^[A-Z0-9-]{6,10}$/.test(v.trim().toUpperCase())
@@ -54,7 +45,6 @@ export const mongoId = (label) => (v) =>
       ? `${label} must be a valid ID (24-char hex)`
       : null;
 
-/** Validate all rules in a { field: [validator, ...] } map. Returns errors object. */
 export function validate(rules, form) {
   const errors = {};
   for (const [field, validators] of Object.entries(rules)) {
@@ -69,7 +59,6 @@ export function validate(rules, form) {
   return errors;
 }
 
-// ── Per-form rule sets ────────────────────────────────────────────────────────
 
 export const VEHICLE_RULES = {
   name: [required("Vehicle name")],
@@ -116,7 +105,6 @@ export const MAINTENANCE_RULES = {
   scheduled_date: [required("Scheduled date")],
 };
 
-/** Extra: description required when service_type = "other" */
 export function validateMaintenance(form) {
   const errors = validate(MAINTENANCE_RULES, form);
   if (form.service_type === "other" && !form.description?.trim()) {

@@ -16,7 +16,6 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-    // Check if user is already authenticated on mount
     useEffect(() => {
         checkAuth();
     }, []);

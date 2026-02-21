@@ -20,13 +20,11 @@ export const createVehicle = asyncHandler(async (req, res) => {
     notes,
   } = req.body;
 
-  // Validate and fetch vehicle type for snapshot
   const vehicleType = await VehicleType.findById(vehicle_type_id);
   if (!vehicleType || !vehicleType.active) {
     throw new ApiError(404, "Vehicle type not found or inactive");
   }
 
-  // Prepare vehicle data with snapshot pattern
   const vehicleData = {
     license_plate,
     name,
@@ -44,7 +42,6 @@ export const createVehicle = asyncHandler(async (req, res) => {
     created_by: req.user?._id,
   };
 
-  // Optionally add region snapshot
   if (region_id) {
     const region = await Region.findById(region_id);
     if (!region || !region.active) {
@@ -116,7 +113,6 @@ export const updateVehicle = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Vehicle not found");
   }
 
-  // Update basic fields
   if (name !== undefined) vehicle.name = name;
   if (max_load_kg !== undefined) vehicle.max_load_kg = max_load_kg;
   if (current_odometer !== undefined) vehicle.current_odometer = current_odometer;
@@ -126,7 +122,6 @@ export const updateVehicle = asyncHandler(async (req, res) => {
   if (notes !== undefined) vehicle.notes = notes;
   if (active !== undefined) vehicle.active = active;
 
-  // Update vehicle type snapshot if changed
   if (vehicle_type_id && vehicle_type_id !== vehicle.vehicle_type._id.toString()) {
     const vehicleType = await VehicleType.findById(vehicle_type_id);
     if (!vehicleType || !vehicleType.active) {
@@ -139,7 +134,6 @@ export const updateVehicle = asyncHandler(async (req, res) => {
     };
   }
 
-  // Update region snapshot if changed
   if (region_id !== undefined) {
     if (region_id) {
       const region = await Region.findById(region_id);

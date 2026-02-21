@@ -15,7 +15,6 @@ import {
 } from "../middlewares/vehicle.middleware.js";
 
 import { verifyJwt } from "../middlewares/auth.middleware.js";
-// import { checkRole } from "../middlewares/rbac.middleware.js";
 
 const router = express.Router();
 
@@ -23,7 +22,6 @@ const router = express.Router();
 router.post(
   "/",
   verifyJwt,
-  // checkRole("Fleet Manager"),
   validateVehicle,
   createVehicle
 );
@@ -47,7 +45,6 @@ router.patch(
 router.delete(
   "/:id",
   verifyJwt,
-  // checkRole("Fleet Manager"),
   deleteVehicle
 );
 
@@ -55,7 +52,6 @@ router.delete(
 router.patch(
   "/retire/:id",
   verifyJwt,
-  // checkRole("Fleet Manager"),
   retireVehicle
 );
 

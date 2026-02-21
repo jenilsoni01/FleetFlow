@@ -1,12 +1,4 @@
-/**
- * exportToCsv
- * -----------
- * Converts an array of plain objects into a downloadable CSV file.
- *
- * @param {string}   filename  - Name including .csv extension, e.g. "monthly-trend.csv"
- * @param {object[]} rows      - Array of flat objects; keys become column headers
- * @param {string[]} [columns] - Optional ordered column list (subset/reorder of keys)
- */
+
 export function exportToCsv(filename, rows, columns) {
   if (!rows || rows.length === 0) return;
 
@@ -14,7 +6,6 @@ export function exportToCsv(filename, rows, columns) {
 
   const escape = (value) => {
     const s = value == null ? "" : String(value);
-    // Wrap in quotes if the value contains commas, quotes, or newlines
     return s.includes(",") || s.includes('"') || s.includes("\n")
       ? `"${s.replace(/"/g, '""')}"`
       : s;
@@ -40,12 +31,8 @@ export function exportToCsv(filename, rows, columns) {
   URL.revokeObjectURL(url);
 }
 
-// ─── Pre-built report generators ───────────────────────────────────────────
 
-/**
- * Export the monthly burn-rate trend data.
- * Columns: Month, Trip Expenses (₹), Maintenance (₹), Total (₹)
- */
+ 
 export function exportMonthlyTrend(burnData, months) {
   const rows = burnData.map((m) => ({
     Month: m.month ?? "",
@@ -56,10 +43,8 @@ export function exportMonthlyTrend(burnData, months) {
   exportToCsv(`fleetflow-monthly-trend-${months}mo.csv`, rows);
 }
 
-/**
- * Export the stacked expense composition per month.
- * Columns: Month, Fuel, Toll, Parking, Fine, Other, Maintenance
- */
+
+ 
 export function exportMonthlyComposition(stackedData, months) {
   const TYPES = ["fuel", "toll", "parking", "fine", "other", "maintenance"];
   const rows = stackedData.map((m) => {
@@ -72,10 +57,7 @@ export function exportMonthlyComposition(stackedData, months) {
   exportToCsv(`fleetflow-expense-composition-${months}mo.csv`, rows);
 }
 
-/**
- * Export total spend aggregated by expense type.
- * Columns: Category, Total (₹), % of Total
- */
+
 export function exportCategoryBreakdown(typeAgg, totalSpend) {
   const rows = typeAgg.map((t) => ({
     Category: t.type ?? "",
@@ -86,10 +68,7 @@ export function exportCategoryBreakdown(typeAgg, totalSpend) {
   exportToCsv("fleetflow-category-breakdown.csv", rows);
 }
 
-/**
- * Export every individual expense entry from the Expenses analytics tab.
- * Columns: Date, Trip Reference, Type, Amount (₹), Description
- */
+
 export function exportExpensesList(expenseChartData) {
   const rows = expenseChartData.map((e) => ({
     Date: e.fullDate ?? e.label ?? "",

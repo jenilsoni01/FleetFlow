@@ -7,9 +7,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
-// ---------------------------------------------------------------------------
 // POST /api/drivers  — Create a new driver
-// ---------------------------------------------------------------------------
 export const createDriver = asyncHandler(async (req, res) => {
   const {
     name,
@@ -38,7 +36,6 @@ export const createDriver = asyncHandler(async (req, res) => {
     );
   }
 
-  // Prevent duplicate employee_id / license_number
   const existing = await FleetDriver.findOne({
     $or: [
       { employee_id: employee_id.toUpperCase() },
@@ -71,7 +68,6 @@ export const createDriver = asyncHandler(async (req, res) => {
     updated_by: req.user?._id ?? null,
   };
 
-  // Optional region snapshot
   if (region_id && mongoose.isValidObjectId(region_id)) {
     const region = await Region.findById(region_id);
     if (region) {
@@ -90,11 +86,6 @@ export const createDriver = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, driver, "Driver created successfully"));
 });
 
-// ---------------------------------------------------------------------------
-// GET /api/drivers  — List drivers with filters
-// Query: status, region_id, license_category, compliance (valid | expired),
-//        expiring (days, e.g. ?expiring=30), page, limit
-// ---------------------------------------------------------------------------
 export const getDrivers = asyncHandler(async (req, res) => {
   const {
     status,
@@ -116,16 +107,13 @@ export const getDrivers = asyncHandler(async (req, res) => {
 
   const now = new Date();
 
-  // compliance=expired → license already past expiry
   if (compliance === "expired") {
     match.license_expiry = { $lt: now };
   }
-  // compliance=valid → license not yet expired
   if (compliance === "valid") {
     match.license_expiry = { $gte: now };
   }
 
-  // ?expiring=30 → license expires within next N days
   if (expiring) {
     const days = Number(expiring);
     if (!isNaN(days) && days > 0) {
@@ -142,7 +130,6 @@ export const getDrivers = asyncHandler(async (req, res) => {
     FleetDriver.countDocuments(match),
   ]);
 
-  // Attach computed compliance flags
   const enriched = drivers.map((d) => {
     const doc = d.toObject();
     const daysUntilExpiry = Math.ceil(
@@ -166,9 +153,7 @@ export const getDrivers = asyncHandler(async (req, res) => {
     );
 });
 
-// ---------------------------------------------------------------------------
-// GET /api/drivers/:id  — Get single driver
-// ---------------------------------------------------------------------------
+// GET /api/drivers/:id  
 export const getDriver = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid driver id");
@@ -197,9 +182,7 @@ export const getDriver = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, doc, "Driver fetched successfully"));
 });
 
-// ---------------------------------------------------------------------------
 // PATCH /api/drivers/:id  — Update driver fields
-// ---------------------------------------------------------------------------
 export const updateDriver = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid driver id");
@@ -252,11 +235,7 @@ export const updateDriver = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, driver, "Driver updated successfully"));
 });
 
-// ---------------------------------------------------------------------------
-// PATCH /api/drivers/:id/status  — Toggle duty status
-// Body: { status: "on_duty" | "off_duty" }
-// Note: "suspended" must use the /suspend endpoint; "on_trip" is set by trip
-// ---------------------------------------------------------------------------
+// PATCH /api/drivers/:id/status  
 export const updateDriverStatus = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid driver id");
@@ -299,10 +278,7 @@ export const updateDriverStatus = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, driver, `Driver status updated to ${status}`));
 });
 
-// ---------------------------------------------------------------------------
-// PATCH /api/drivers/:id/suspend  — Suspend a driver (requires reason)
-// Cancels any dispatched trips assigned to this driver
-// ---------------------------------------------------------------------------
+// PATCH /api/drivers/:id/suspend 
 export const suspendDriver = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid driver id");
@@ -350,9 +326,7 @@ export const suspendDriver = asyncHandler(async (req, res) => {
     );
 });
 
-// ---------------------------------------------------------------------------
-// DELETE /api/drivers/:id  — Soft delete
-// ---------------------------------------------------------------------------
+// DELETE /api/drivers/:id 
 export const deleteDriver = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid driver id");
@@ -380,10 +354,7 @@ export const deleteDriver = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Driver deleted successfully"));
 });
 
-// ---------------------------------------------------------------------------
 // GET /api/drivers/:id/performance
-// Computes trip completion rate, on-time rate, safety score, incident history
-// ---------------------------------------------------------------------------
 export const getDriverPerformance = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid driver id");
@@ -395,7 +366,6 @@ export const getDriverPerformance = asyncHandler(async (req, res) => {
   if (!driver) throw new ApiError(404, "Driver not found");
 
   const [tripStats, incidentStats] = await Promise.all([
-    // Trip statistics
     FleetTrip.aggregate([
       { $match: { "driver._id": driverObjId } },
       {
@@ -406,7 +376,6 @@ export const getDriverPerformance = asyncHandler(async (req, res) => {
       },
     ]),
 
-    // Safety incidents
     SafetyIncident.aggregate([
       { $match: { "driver._id": driverObjId, active: true } },
       {
@@ -418,7 +387,6 @@ export const getDriverPerformance = asyncHandler(async (req, res) => {
     ]),
   ]);
 
-  // Aggregate trip status counts
   const tripCounts = { total: 0, completed: 0, cancelled: 0, in_transit: 0 };
   tripStats.forEach(({ _id, count }) => {
     tripCounts.total += count;
@@ -432,7 +400,6 @@ export const getDriverPerformance = asyncHandler(async (req, res) => {
       ? Math.round((tripCounts.completed / tripCounts.total) * 100 * 10) / 10
       : 0;
 
-  // On-time deliveries: completed trips where actual_arrival <= estimated_arrival
   const onTimeCount = await FleetTrip.countDocuments({
     "driver._id": driverObjId,
     status: "completed",
@@ -446,10 +413,6 @@ export const getDriverPerformance = asyncHandler(async (req, res) => {
       ? Math.round((onTimeCount / tripCounts.completed) * 100 * 10) / 10
       : 0;
 
-  // Safety score calculation per spec:
-  //   Base: 100
-  //   -10 per violation, -20 per accident, -5 per complaint, -2 per near_miss
-  //   +5 if 100+ trips without incident
   const incidentCounts = {
     accident: 0,
     violation: 0,
@@ -471,16 +434,13 @@ export const getDriverPerformance = asyncHandler(async (req, res) => {
     0,
   );
   if (tripCounts.completed >= 100 && totalIncidents === 0) {
-    safetyScore += 5; // bonus for 100+ incident-free trips
+    safetyScore += 5; 
   }
 
-  safetyScore = Math.max(0, Math.min(100, safetyScore)); // clamp 0–100
-
-  // Colour coding per spec: >80 green, 60-80 yellow, <60 red
+  safetyScore = Math.max(0, Math.min(100, safetyScore)); 
   const safetyScoreColor =
     safetyScore > 80 ? "green" : safetyScore >= 60 ? "yellow" : "red";
 
-  // Update stored metrics if they've changed
   const storedScore = driver.metrics.safety_score;
   const storedRate = driver.metrics.trip_completion_rate;
   if (storedScore !== safetyScore || storedRate !== tripCompletionRate) {
@@ -532,9 +492,7 @@ export const getDriverPerformance = asyncHandler(async (req, res) => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/drivers/:id/training  — Add a training record
-// ---------------------------------------------------------------------------
+// POST /api/drivers/:id/training  
 export const addTrainingRecord = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     throw new ApiError(400, "Invalid driver id");

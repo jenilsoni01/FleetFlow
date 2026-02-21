@@ -397,8 +397,6 @@ export default function Drivers() {
         </div>
       )}
 
-      {/* Create / Edit Modal */}
-      {/* Create Modal */}
       <Modal
         open={showCreate}
         onClose={() => {
@@ -601,7 +599,6 @@ export default function Drivers() {
         </div>
       </Modal>
 
-      {/* Suspend Modal */}
       <Modal
         open={!!suspendModal}
         onClose={() => {
@@ -654,7 +651,6 @@ export default function Drivers() {
         )}
       </Modal>
 
-      {/* Performance Modal */}
       <Modal
         open={!!perfModal}
         onClose={() => setPerfModal(null)}

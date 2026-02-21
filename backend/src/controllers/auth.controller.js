@@ -39,14 +39,12 @@ const generateAccessAndRefreshTokens = async (userId) => {
 const registerUser = asyncHandler(async (req, res) => {
   const { userName, email, password, role } = req.body;
 
-  // 2. Check if all required fields are present
   if (!userName || !email || !password || !role) {
     throw new ApiError(400, "userName, Email, Password, and Role are required");
   }
 
-  const normalizedEmail = email.toLowerCase().trim(); // Normalize email
+  const normalizedEmail = email.toLowerCase().trim(); 
 
-  // 3. Check if user already exists in MongoDB
   const existingUser = await User.findOne({ email: normalizedEmail });
 
   if (existingUser) {
@@ -57,7 +55,7 @@ const registerUser = asyncHandler(async (req, res) => {
     userName: userName,
     email: normalizedEmail,
     password: password,
-    role: role, // e.g., 'MANAGER', 'DISPATCHER', 'DRIVER'
+    role: role, 
   });
 
 
@@ -92,7 +90,7 @@ const logInUser = asyncHandler(async (req, res, next) => {
   if (!email || !password) {
     throw new ApiError(400, "Email and password are required");
   }
-  const normalizedEmail = email.toLowerCase().trim(); // Normalize email
+  const normalizedEmail = email.toLowerCase().trim(); 
   const user = await User.findOne({ email: normalizedEmail });
 
   if (!user) {
@@ -108,8 +106,6 @@ const logInUser = asyncHandler(async (req, res, next) => {
   const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
     user._id,
   );
-
-  // 7. Send the response back to the client
   return res
     .status(200)
     .cookie("accessToken", accessToken, accessTokenOptions)

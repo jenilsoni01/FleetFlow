@@ -6,9 +6,6 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
-// ---------------------------------------------------------------------------
-// Helper: build $match for expense-level queries from query params
-// ---------------------------------------------------------------------------
 const buildExpenseMatch = (query) => {
   const { vehicle_id, expense_type, startDate, endDate } = query;
 
@@ -44,11 +41,7 @@ const buildExpenseMatch = (query) => {
   return { tripMatch, expenseMatch };
 };
 
-// ---------------------------------------------------------------------------
 // GET /api/expenses
-// List all expenses across all trips with optional filters + pagination
-// Query: vehicle_id, expense_type, startDate, endDate, page, limit
-// ---------------------------------------------------------------------------
 export const listExpenses = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20 } = req.query;
   const { tripMatch, expenseMatch } = buildExpenseMatch(req.query);
@@ -59,7 +52,6 @@ export const listExpenses = asyncHandler(async (req, res) => {
     { $match: tripMatch },
     { $unwind: "$expenses" },
     { $match: expenseMatch },
-    // Attach trip-level snapshot fields next to each expense
     {
       $addFields: {
         "expenses.trip_reference": "$trip_reference",
@@ -93,12 +85,7 @@ export const listExpenses = asyncHandler(async (req, res) => {
     );
 });
 
-// ---------------------------------------------------------------------------
 // GET /api/expenses/summary/vehicle/:vehicle_id
-// Total Operational Cost = fuel expenses + completed maintenance costs
-// Also returns: cost per km, total distance, monthly burn breakdown
-// Query: startDate, endDate
-// ---------------------------------------------------------------------------
 export const getVehicleOperationalCost = asyncHandler(async (req, res) => {
   const { vehicle_id } = req.params;
 
@@ -108,7 +95,6 @@ export const getVehicleOperationalCost = asyncHandler(async (req, res) => {
 
   const vehicleObjId = new mongoose.Types.ObjectId(vehicle_id);
 
-  // Optional date range on expense_date / completion date
   let dateFilter = {};
   if (req.query.startDate || req.query.endDate) {
     dateFilter = {};
@@ -134,10 +120,8 @@ export const getVehicleOperationalCost = asyncHandler(async (req, res) => {
       ? { "dates.completion": dateFilter }
       : {};
 
-  // Run all 3 aggregations concurrently
   const [fuelResult, otherExpensesResult, maintenanceResult, distanceResult] =
     await Promise.all([
-      // 1. Fuel total + quantity
       FleetTrip.aggregate([
         { $match: { "vehicle._id": vehicleObjId, active: true } },
         { $unwind: "$expenses" },
@@ -159,7 +143,6 @@ export const getVehicleOperationalCost = asyncHandler(async (req, res) => {
         },
       ]),
 
-      // 2. Non-fuel trip expenses total
       FleetTrip.aggregate([
         { $match: { "vehicle._id": vehicleObjId, active: true } },
         { $unwind: "$expenses" },
@@ -178,7 +161,6 @@ export const getVehicleOperationalCost = asyncHandler(async (req, res) => {
         },
       ]),
 
-      // 3. Completed maintenance cost
       MaintenanceLog.aggregate([
         {
           $match: {
@@ -199,7 +181,6 @@ export const getVehicleOperationalCost = asyncHandler(async (req, res) => {
         },
       ]),
 
-      // 4. Total distance driven from completed trips
       FleetTrip.aggregate([
         {
           $match: {
@@ -238,7 +219,6 @@ export const getVehicleOperationalCost = asyncHandler(async (req, res) => {
       ? Math.round((totalDistanceKm / fuelLiters) * 100) / 100
       : null;
 
-  // Fetch vehicle name for context
   const vehicle = await FleetVehicle.findById(vehicleObjId).select(
     "name license_plate current_odometer",
   );
@@ -279,11 +259,7 @@ export const getVehicleOperationalCost = asyncHandler(async (req, res) => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // GET /api/expenses/summary/monthly
-// Monthly burn rate: fuel + other trip expenses grouped by month
-// Query: vehicle_id (optional), months (default 6)
-// ---------------------------------------------------------------------------
 export const getMonthlyBurnRate = asyncHandler(async (req, res) => {
   const { vehicle_id, months = 6 } = req.query;
 
@@ -299,7 +275,6 @@ export const getMonthlyBurnRate = asyncHandler(async (req, res) => {
   }
 
   const [tripBurn, maintenanceBurn] = await Promise.all([
-    // Trip expenses by month
     FleetTrip.aggregate([
       { $match: tripMatch },
       { $unwind: "$expenses" },
@@ -335,7 +310,6 @@ export const getMonthlyBurnRate = asyncHandler(async (req, res) => {
       { $sort: { _id: 1 } },
     ]),
 
-    // Maintenance costs by month (completion date)
     MaintenanceLog.aggregate([
       {
         $match: {
@@ -359,7 +333,6 @@ export const getMonthlyBurnRate = asyncHandler(async (req, res) => {
     ]),
   ]);
 
-  // Merge into a single month-keyed map
   const monthMap = {};
   tripBurn.forEach(({ _id, breakdown, totalExpenses }) => {
     monthMap[_id] = {
@@ -402,10 +375,7 @@ export const getMonthlyBurnRate = asyncHandler(async (req, res) => {
     );
 });
 
-// ---------------------------------------------------------------------------
 // GET /api/expenses/fuel-efficiency/:vehicle_id
-// Fuel efficiency over time (km/L per fill-up) for one vehicle
-// ---------------------------------------------------------------------------
 export const getVehicleFuelEfficiency = asyncHandler(async (req, res) => {
   const { vehicle_id } = req.params;
 
@@ -415,7 +385,6 @@ export const getVehicleFuelEfficiency = asyncHandler(async (req, res) => {
 
   const vehicleObjId = new mongoose.Types.ObjectId(vehicle_id);
 
-  // Fetch all fuel expenses for this vehicle, ordered by odometer reading
   const fuelExpenses = await FleetTrip.aggregate([
     { $match: { "vehicle._id": vehicleObjId, active: true } },
     { $unwind: "$expenses" },
@@ -441,7 +410,6 @@ export const getVehicleFuelEfficiency = asyncHandler(async (req, res) => {
     { $sort: { odometer_reading: 1 } },
   ]);
 
-  // Calculate efficiency between consecutive fill-ups
   const efficiencyPoints = fuelExpenses.map((entry, idx) => {
     if (idx === 0) return { ...entry, efficiency_km_per_liter: null };
 

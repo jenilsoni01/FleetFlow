@@ -147,7 +147,6 @@ export default function Dashboard() {
   const fuelTrend = charts.fuelSpendTrend ?? [];
   const topVehicles = charts.topVehiclesByDistance ?? [];
 
-  // Shorten date labels e.g. "2026-02-21" → "Feb 21"
   const weeklyVolumeLabelled = weeklyVolume.map((d) => ({
     ...d,
     label: new Date(d.date + "T00:00:00").toLocaleDateString("en-IN", {
@@ -156,7 +155,6 @@ export default function Dashboard() {
     }),
   }));
 
-  // Shorten month labels e.g. "2026-02" → "Feb '26"
   const fuelTrendLabelled = fuelTrend.map((d) => ({
     ...d,
     label: new Date(d.month + "-01").toLocaleDateString("en-IN", {
@@ -239,7 +237,6 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* ── Charts row 1: Trip Volume (wide) + Fleet Breakdown (narrow) ── */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Weekly Trip Volume — spans 2 of 3 columns */}
             <div className="xl:col-span-2">
@@ -285,7 +282,6 @@ export default function Dashboard() {
               </ChartCard>
             </div>
 
-            {/* Fleet Status Breakdown — spans 1 of 3 columns */}
             <ChartCard
               title="Fleet Status Breakdown"
               icon={Truck}
@@ -323,9 +319,8 @@ export default function Dashboard() {
             </ChartCard>
           </div>
 
-          {/* ── Charts row 2: Fuel Trend (wide) + Top Vehicles (narrow) ── */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Fuel Spend Trend — spans 2 of 3 columns */}
+            
             <div className="xl:col-span-2">
               <ChartCard
                 title="Fuel Spend Trend (Last 6 Months)"
@@ -393,7 +388,6 @@ export default function Dashboard() {
               </ChartCard>
             </div>
 
-            {/* Top Vehicles by Distance — spans 1 of 3 columns */}
             <ChartCard
               title="Top Vehicles by Distance (This Month)"
               icon={TrendingUp}

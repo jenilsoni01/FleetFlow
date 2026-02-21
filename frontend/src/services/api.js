@@ -5,14 +5,12 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Attach accessToken from localStorage on every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("accessToken");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// On 401 → try to refresh, then retry once
 let refreshing = false;
 let queue = [];
 

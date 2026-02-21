@@ -1,17 +1,6 @@
-/**
- * Shared reusable form field with inline error display.
- *
- * Usage:
- *   <FormField label="Name" error={errors.name}>
- *     <input ... className={inputCls(errors.name)} />
- *   </FormField>
- *
- * Or with the InputField / SelectField shortcuts:
- *   <InputField label="Name" name="name" form={form} errors={errors} onChange={setF} />
- */
+
 import React from "react";
 
-// Base className for every input — append this to your input's className
 export const inputCls = (error) =>
   `w-full bg-gray-800 border rounded-lg px-3 py-2 text-sm text-gray-200
    focus:outline-none transition-colors
@@ -30,7 +19,6 @@ export function FormField({ label, error, required: req, children }) {
   );
 }
 
-/** Controlled text / number / date shortcut */
 export function InputField({
   label,
   name,
@@ -61,7 +49,6 @@ export function InputField({
   );
 }
 
-/** Controlled select shortcut */
 export function SelectField({
   label,
   name,

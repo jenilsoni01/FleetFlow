@@ -450,7 +450,6 @@ export default function Vehicles() {
         </div>
       )}
 
-      {/* Create Modal */}
       <Modal
         open={showCreate}
         onClose={() => {
@@ -483,7 +482,6 @@ export default function Vehicles() {
         </div>
       </Modal>
 
-      {/* Edit Modal */}
       <Modal
         open={!!editing}
         onClose={() => {

@@ -16,7 +16,7 @@ const Toast = ({ message, type = 'info', duration = 3000, onClose }) => {
         setIsVisible(false);
         setTimeout(() => {
             if (onClose) onClose();
-        }, 300); // Wait for fade-out animation
+        }, 300); 
     };
 
     const icons = {
@@ -40,5 +40,4 @@ const Toast = ({ message, type = 'info', duration = 3000, onClose }) => {
     );
 };
 
-// Simple hook-like helper could be implemented here or in a context/store for easier usage
 export default Toast;
