@@ -17,17 +17,8 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-
-
-import authRouter from "./routers/auth.routes.js";
-import userRouter from "./routers/user.routes.js";
-import cplrouter from "./routers/CPL_2026/registerCpl.routes.js"
-import cfRouter from "./routers/CPL_2026/codeforces.routes.js"
+import authRouter from "./routes/auth.routes.js";
 // auth routes
 app.use("/api/auth", authRouter);
-app.use("/api/user", userRouter);
-app.use("/api/cpl", cplrouter);
-app.use("/api/cf", cfRouter);
-
 
 export default app;
