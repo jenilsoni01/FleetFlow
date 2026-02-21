@@ -130,7 +130,7 @@ maintenanceLogSchema.index({ "vehicle._id": 1 });
 maintenanceLogSchema.index({ status: 1 });
 maintenanceLogSchema.index({ "dates.scheduled": 1 });
 maintenanceLogSchema.index({ active: 1 }, { sparse: true });
-maintenanceLogSchema.index({ "vehicle._id": 1, status: 1 }); s
+maintenanceLogSchema.index({ "vehicle._id": 1, status: 1 }); 
 
 maintenanceLogSchema.pre("save", function () {
   if (this.isModified("parts")) {
