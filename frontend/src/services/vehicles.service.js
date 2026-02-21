@@ -16,4 +16,4 @@ export const deleteVehicle = (id) =>
   api.delete(`/vehicles/${id}`).then((r) => r.data);
 
 export const retireVehicle = (id) =>
-  api.patch(`/vehicles/${id}/retire`).then((r) => r.data.data);
+  api.patch(`/vehicles/retire/${id}`).then((r) => r.data.data);

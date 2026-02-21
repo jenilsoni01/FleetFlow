@@ -251,7 +251,7 @@ export default function Drivers() {
                   "Name",
                   "Employee ID",
                   "License",
-                  "Expiry",
+                  "Expiry / Med. Cert",
                   "Compliance",
                   "Status",
                   "Actions",
@@ -271,9 +271,23 @@ export default function Drivers() {
                   key={d._id}
                   className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors"
                 >
-                  <td className="px-4 py-3 text-white font-medium">{d.name}</td>
-                  <td className="px-4 py-3 text-gray-400 font-mono text-xs">
-                    {d.employee_id}
+                  <td className="px-4 py-3">
+                    <div className="text-white font-medium">{d.name}</div>
+                    {d.contact?.phone && (
+                      <div className="text-gray-600 text-xs mt-0.5">
+                        {d.contact.phone}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="text-gray-400 font-mono text-xs">
+                      {d.employee_id}
+                    </div>
+                    {d.region?.name && (
+                      <div className="text-gray-600 text-xs mt-0.5">
+                        {d.region.name}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-400">
                     {d.license_number}{" "}
@@ -291,6 +305,12 @@ export default function Drivers() {
                       <div className="text-amber-400 text-xs flex items-center gap-1">
                         <AlertTriangle size={10} /> {d.license_days_remaining}d
                         left
+                      </div>
+                    )}
+                    {d.medical_cert_expiry && (
+                      <div className="text-gray-600 text-xs mt-1">
+                        Med:{" "}
+                        {new Date(d.medical_cert_expiry).toLocaleDateString()}
                       </div>
                     )}
                   </td>

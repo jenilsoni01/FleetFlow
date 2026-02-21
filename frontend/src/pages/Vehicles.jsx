@@ -203,7 +203,7 @@ export default function Vehicles() {
   }));
   const regionOptions = regions.map((r) => ({ value: r._id, label: r.name }));
 
-  const VehicleForm = () => (
+  const vehicleFormJSX = (
     <div className="grid grid-cols-2 gap-4">
       <div onBlur={() => blur("name")}>
         <InputField
@@ -355,6 +355,7 @@ export default function Vehicles() {
                   "Name",
                   "License Plate",
                   "Type",
+                  "Region",
                   "Max Load",
                   "Odometer",
                   "Status",
@@ -379,8 +380,18 @@ export default function Vehicles() {
                   <td className="px-4 py-3 text-gray-300 font-mono">
                     {v.license_plate}
                   </td>
+                  <td className="px-4 py-3">
+                    <div className="text-gray-400">
+                      {v.vehicle_type?.name ?? "—"}
+                    </div>
+                    {v.vehicle_type?.required_license_category && (
+                      <div className="text-gray-600 text-xs mt-0.5">
+                        Lic. {v.vehicle_type.required_license_category}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-400">
-                    {v.vehicle_type?.name ?? "—"}
+                    {v.region?.name ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-gray-400">
                     {v.max_load_kg != null
@@ -404,7 +415,14 @@ export default function Vehicles() {
                       </button>
                       {v.status !== "out_of_service" && (
                         <button
-                          onClick={() => retireMut.mutate(v._id)}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "Retire this vehicle? It will be set to out of service.",
+                              )
+                            )
+                              retireMut.mutate(v._id);
+                          }}
                           className="p-1.5 text-gray-500 hover:text-amber-400 hover:bg-gray-800 rounded-lg transition-colors"
                           title="Retire"
                         >
@@ -443,7 +461,7 @@ export default function Vehicles() {
         title="Add New Vehicle"
         size="lg"
       >
-        <VehicleForm />
+        {vehicleFormJSX}
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={() => {
@@ -476,7 +494,7 @@ export default function Vehicles() {
         title="Edit Vehicle"
         size="lg"
       >
-        {editing && <VehicleForm />}
+        {editing && vehicleFormJSX}
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={() => {

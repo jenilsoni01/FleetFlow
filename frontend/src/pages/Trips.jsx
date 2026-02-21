@@ -1,15 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Search,
-  Eye,
-  Trash2,
-  Play,
-  CheckCircle,
-  X,
-  Send,
-} from "lucide-react";
+import { Plus, Search, Eye, Play, CheckCircle, X, Send } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
@@ -46,6 +37,13 @@ const PRIORITY_OPTIONS = [
   { value: "urgent", label: "Urgent" },
 ];
 
+const PAST_TENSE = {
+  dispatch: "dispatched",
+  start: "started",
+  complete: "completed",
+  cancel: "cancelled",
+};
+
 const EMPTY_FORM = {
   origin: "",
   destination: "",
@@ -68,6 +66,7 @@ export default function Trips() {
   const [touched, setTouched] = useState({});
   const [actionModal, setActionModal] = useState(null); // { type, trip }
   const [cancelReason, setCancelReason] = useState("");
+  const [odometerEnd, setOdometerEnd] = useState("");
   const toast = useToast();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -129,9 +128,10 @@ export default function Trips() {
       if (type === "cancel") return cancelTrip(id, payload);
     },
     onSuccess: (_, { type }) => {
-      toast.success(`Trip ${type}ed successfully`);
+      toast.success(`Trip ${PAST_TENSE[type] ?? type} successfully`);
       setActionModal(null);
       setCancelReason("");
+      setOdometerEnd("");
       invalidate();
     },
     onError: (e) => toast.error(e.response?.data?.message ?? "Action failed"),
@@ -139,8 +139,9 @@ export default function Trips() {
 
   const handleAction = (type) => {
     const { trip } = actionModal;
-    const payload =
-      type === "cancel" ? { cancellation_reason: cancelReason } : {};
+    let payload = {};
+    if (type === "cancel") payload = { cancellation_reason: cancelReason };
+    if (type === "complete") payload = { odometer_end: Number(odometerEnd) };
     actionMut.mutate({ type, id: trip._id, payload });
   };
 
@@ -244,6 +245,7 @@ export default function Trips() {
                   "Vehicle",
                   "Driver",
                   "Origin → Destination",
+                  "Priority",
                   "Scheduled",
                   "Status",
                   "Actions",
@@ -273,8 +275,27 @@ export default function Trips() {
                     {trip.driver?.name ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-gray-400 max-w-48 truncate text-xs">
-                    {trip.origin?.address} → {trip.destination?.address}
-                  </td>
+                    {trip.origin} → {trip.destination}
+                  </td>{" "}
+                  <td className="px-4 py-3">
+                    {trip.priority ? (
+                      <span
+                        className={`text-xs font-medium capitalize ${
+                          trip.priority === "urgent"
+                            ? "text-red-400"
+                            : trip.priority === "high"
+                              ? "text-amber-400"
+                              : trip.priority === "medium"
+                                ? "text-blue-400"
+                                : "text-gray-500"
+                        }`}
+                      >
+                        {trip.priority}
+                      </span>
+                    ) : (
+                      <span className="text-gray-700">&mdash;</span>
+                    )}
+                  </td>{" "}
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {trip.schedule?.scheduled_departure
                       ? new Date(
@@ -327,7 +348,9 @@ export default function Trips() {
                           <CheckCircle size={14} />
                         </button>
                       )}
-                      {["draft", "dispatched"].includes(trip.status) && (
+                      {["draft", "dispatched", "in_transit"].includes(
+                        trip.status,
+                      ) && (
                         <button
                           onClick={() =>
                             setActionModal({ type: "cancel", trip })
@@ -484,6 +507,7 @@ export default function Trips() {
         onClose={() => {
           setActionModal(null);
           setCancelReason("");
+          setOdometerEnd("");
         }}
         title={
           actionModal
@@ -508,6 +532,21 @@ export default function Trips() {
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500 resize-none mb-4"
               />
             )}
+            {actionModal.type === "complete" && (
+              <div className="mb-4">
+                <label className="block text-gray-400 text-xs mb-1">
+                  End Odometer (km) *
+                </label>
+                <input
+                  type="number"
+                  value={odometerEnd}
+                  onChange={(e) => setOdometerEnd(e.target.value)}
+                  placeholder="e.g. 125000"
+                  min={0}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            )}
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
@@ -522,7 +561,8 @@ export default function Trips() {
                 onClick={() => handleAction(actionModal.type)}
                 disabled={
                   actionMut.isPending ||
-                  (actionModal.type === "cancel" && !cancelReason.trim())
+                  (actionModal.type === "cancel" && !cancelReason.trim()) ||
+                  (actionModal.type === "complete" && !odometerEnd)
                 }
                 className={`px-4 py-2 text-sm rounded-lg text-white transition-colors disabled:opacity-60 ${
                   actionModal.type === "cancel"

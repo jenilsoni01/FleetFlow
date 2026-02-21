@@ -19,7 +19,7 @@ import { getVehicles } from "../services/vehicles.service";
 
 const STATUS_FILTERS = [
   "all",
-  "pending",
+  "scheduled",
   "in_progress",
   "completed",
   "cancelled",
@@ -39,7 +39,7 @@ const EMPTY = {
   description: "",
   cost: "",
   scheduled_date: "",
-  technician_name: "",
+  service_provider: "",
 };
 
 export default function Maintenance() {
@@ -132,7 +132,7 @@ export default function Maintenance() {
       description: l.description ?? "",
       cost: l.cost ?? "",
       scheduled_date: l.dates?.scheduled?.split("T")[0] ?? "",
-      technician_name: l.technician_name ?? "",
+      service_provider: l.service_provider ?? "",
       status: l.status,
     });
   };
@@ -169,7 +169,7 @@ export default function Maintenance() {
       description: form.description || undefined,
       cost: form.cost ? Number(form.cost) : undefined,
       scheduled_date: form.scheduled_date,
-      technician_name: form.technician_name || undefined,
+      service_provider: form.service_provider || undefined,
       ...(isEdit && form.status && { status: form.status }),
     };
     if (isEdit) {
@@ -231,8 +231,9 @@ export default function Maintenance() {
                   "Service Type",
                   "Description",
                   "Cost",
-                  "Scheduled",
-                  "Technician",
+                  "Odometer",
+                  "Dates",
+                  "Provider",
                   "Status",
                   "Actions",
                 ].map((h) => (
@@ -251,8 +252,15 @@ export default function Maintenance() {
                   key={l._id}
                   className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors"
                 >
-                  <td className="px-4 py-3 text-white font-medium">
-                    {l.vehicle?.name ?? "—"}
+                  <td className="px-4 py-3">
+                    <div className="text-white font-medium">
+                      {l.vehicle?.name ?? "—"}
+                    </div>
+                    {l.vehicle?.license_plate && (
+                      <div className="text-gray-600 text-xs mt-0.5 font-mono">
+                        {l.vehicle.license_plate}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-400 capitalize">
                     {l.service_type?.replace(/_/g, " ") ?? "—"}
@@ -265,13 +273,32 @@ export default function Maintenance() {
                       ? `₹${Number(l.cost).toLocaleString()}`
                       : "—"}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    {l.dates?.scheduled
-                      ? new Date(l.dates.scheduled).toLocaleDateString()
+                  <td className="px-4 py-3 text-gray-400">
+                    {l.odometer_at_service != null
+                      ? `${Number(l.odometer_at_service).toLocaleString()} km`
                       : "—"}
                   </td>
+                  <td className="px-4 py-3 text-xs">
+                    <div className="text-gray-500">
+                      Sched:{" "}
+                      {l.dates?.scheduled
+                        ? new Date(l.dates.scheduled).toLocaleDateString()
+                        : "—"}
+                    </div>
+                    {l.dates?.start && (
+                      <div className="text-blue-400/70 mt-0.5">
+                        Start: {new Date(l.dates.start).toLocaleDateString()}
+                      </div>
+                    )}
+                    {l.dates?.completion && (
+                      <div className="text-emerald-400/70 mt-0.5">
+                        Done:{" "}
+                        {new Date(l.dates.completion).toLocaleDateString()}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-400">
-                    {l.technician_name ?? "—"}
+                    {l.service_provider ?? "—"}
                   </td>
                   <td className="px-4 py-3">
                     <Badge value={l.status} />
@@ -364,8 +391,8 @@ export default function Maintenance() {
           />
           <div className="col-span-2">
             <InputField
-              label="Technician Name"
-              name="technician_name"
+              label="Service Provider"
+              name="service_provider"
               form={form}
               errors={errors}
               onChange={setF}
@@ -470,8 +497,8 @@ export default function Maintenance() {
               step="0.01"
             />
             <InputField
-              label="Technician Name"
-              name="technician_name"
+              label="Service Provider"
+              name="service_provider"
               form={form}
               errors={errors}
               onChange={setF}
@@ -483,7 +510,7 @@ export default function Maintenance() {
                 onChange={(e) => setF("status", e.target.value)}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
               >
-                {["pending", "in_progress", "completed", "cancelled"].map(
+                {["scheduled", "in_progress", "completed", "cancelled"].map(
                   (s) => (
                     <option key={s} value={s}>
                       {s.replace("_", " ")}
