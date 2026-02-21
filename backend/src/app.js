@@ -3,13 +3,12 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { ApiError } from "./utils/ApiError.js";
 
-// Route imports
+
 import authRouter from "./routes/auth.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import maintenanceRouter from "./routes/maintenance.routes.js";
 
-// Side-effect imports — registers all Mongoose models so controllers
-// that reference e.g. mongoose.model('FleetVehicle') never throw MissingSchemaError
+
 import "./models/user.model.js";
 import "./models/vehicleType.model.js";
 import "./models/region.model.js";
@@ -38,7 +37,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/maintenance", maintenanceRouter);
 
-// Global error handler — must be last; Express identifies it by the 4-arg signature
+
 app.use((err, req, res, next) => {
   const statusCode = err instanceof ApiError ? err.statusCode : 500;
   const message =

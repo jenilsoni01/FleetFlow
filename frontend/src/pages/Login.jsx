@@ -64,10 +64,12 @@ const Login = () => {
                 }
             );
 
-            const { user, accessToken, refreshToken } = response.data.data;
-            login(user, accessToken, refreshToken);
 
+            const user = response.data.data;
+            const {accessToken, refreshToken } = response.data.data;
             setToast({ message: 'Login successful!', type: 'success' });
+            login(user, accessToken, refreshToken);
+            
             setTimeout(() => navigate('/dashboard'), 1500);
         } catch (error) {
             let message = 'Login failed';
