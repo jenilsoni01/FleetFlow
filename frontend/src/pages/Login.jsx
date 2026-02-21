@@ -16,17 +16,19 @@ const Login = () => {
     const location = useLocation();
     const { login, isAuthenticated } = useAuth();
 
-    useEffect(() => {
-        if (isAuthenticated) {
-            navigate('/dashboard', { replace: true });
-        }
-    }, [isAuthenticated, navigate]);
-
+    // Auto-fill email from signup redirect
     useEffect(() => {
         if (location.state?.email) {
             setFormData(prev => ({ ...prev, email: location.state.email }));
         }
     }, [location]);
+
+    // Only redirect if already authenticated AND not coming from signup
+    useEffect(() => {
+        if (isAuthenticated && !location.state?.email) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [isAuthenticated, navigate, location.state?.email]);
 
     const validateForm = () => {
         if (!formData.email) {
@@ -64,12 +66,11 @@ const Login = () => {
                 }
             );
 
-
-            const user = response.data.data;
+            const user = response.data.data ;
             const {accessToken, refreshToken } = response.data.data;
-            setToast({ message: 'Login successful!', type: 'success' });
-            login(user, accessToken, refreshToken);
+            login(user ,  accessToken, refreshToken);
             
+            setToast({ message: 'Login successful!', type: 'success' });
             setTimeout(() => navigate('/dashboard'), 1500);
         } catch (error) {
             let message = 'Login failed';
