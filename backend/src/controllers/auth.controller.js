@@ -66,7 +66,7 @@ const registerUser = asyncHandler(async (req, res) => {
     role: role, // e.g., 'MANAGER', 'DISPATCHER', 'DRIVER'
   });
 
-  console.log("New user created:", newUser);
+
   if (!newUser) {
     throw new ApiError(500, "Error creating new user");
   }
